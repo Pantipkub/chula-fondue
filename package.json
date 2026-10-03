@@ -1,0 +1,17 @@
+{
+  "name": "chula-fondue",
+  "private": true,
+  "workspaces": [
+    "services/*"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "dev": "concurrently -n department,ticket,gateway -c blue,green,magenta \"npm start -w department-service\" \"npm start -w ticket-service\" \"npm start -w api-gateway\""
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.5",
+    "concurrently": "^10.0.5",
+    "typescript": "^7.0.2"
+  }
+}

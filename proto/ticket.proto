@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package ticket;
+
+service TicketService {
+  rpc CreateTicket (CreateTicketRequest) returns (Ticket);
+  rpc ListTickets (ListTicketsRequest) returns (ListTicketsResponse);
+  rpc GetTicketHistory (TicketIdRequest) returns (TicketHistoryResponse);
+  rpc AssignTicket (AssignTicketRequest) returns (Ticket);
+  rpc CancelTicket (TicketIdRequest) returns (Ticket);
+
+  // Optional: implement only after everything in section 8 passes.
+  rpc RejectTicket (ReasonRequest) returns (Ticket);
+  rpc StartProgress (TicketIdRequest) returns (Ticket);
+  rpc ResolveTicket (ResolveTicketRequest) returns (Ticket);
+  rpc ConfirmResolution (TicketIdRequest) returns (Ticket);
+  rpc ReopenTicket (ReasonRequest) returns (Ticket);
+}
+
+message Ticket {
+  string id = 1;
+  string category = 2;
+  string location = 3;
+  string description = 4;
+  string photo_url = 5;
+  string reporter_email = 6;
+  string status = 7;
+  string department_id = 8;
+  string department_name = 9;
+  string reason = 10;
+  string created_at = 11;
+  string updated_at = 12;
+}
+
+message HistoryEntry {
+  string from_status = 1;
+  string to_status = 2;
+  string note = 3;
+  string changed_at = 4;
+}
+
+message CreateTicketRequest {
+  string category = 1;
+  string location = 2;
+  string description = 3;
+  string photo_url = 4;
+  string reporter_email = 5;
+}
+
+message ListTicketsRequest {
+  string status = 1;            // optional filter
+  string department_id = 2;     // optional filter
+  string reporter_email = 3;    // optional filter
+  bool include_cancelled = 4;   // default false
+}
+
+message ListTicketsResponse {
+  repeated Ticket tickets = 1;
+}
+
+message TicketIdRequest {
+  string id = 1;
+}
+
+message TicketHistoryResponse {
+  Ticket ticket = 1;
+  repeated HistoryEntry history = 2;
+}
+
+message AssignTicketRequest {
+  string id = 1;
+  string department_id = 2;
+}
+
+message ReasonRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message ResolveTicketRequest {
+  string id = 1;
+  string completion_photo_url = 2;
+}

@@ -1,0 +1,20 @@
+{
+  "name": "ticket-service",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsc -p . && node dist/main.js"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.5",
+    "@grpc/proto-loader": "^0.8.1",
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/microservices": "^12.1.2",
+    "@nestjs/typeorm": "^12.0.2",
+    "better-sqlite3": "^12.11.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "typeorm": "^1.1.1"
+  }
+}

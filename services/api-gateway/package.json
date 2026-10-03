@@ -1,0 +1,18 @@
+{
+  "name": "api-gateway",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsc -p . && node dist/main.js"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.5",
+    "@grpc/proto-loader": "^0.8.1",
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/microservices": "^12.1.2",
+    "@nestjs/platform-express": "^12.1.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  }
+}
