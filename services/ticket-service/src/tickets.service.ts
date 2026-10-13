@@ -1,12 +1,12 @@
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { Injectable, Logger } from '@nestjs/common';
-import { RpcException } from '@nestjs/microservices';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { NotificationStub } from './notification.stub.js';
 import { Ticket, TicketHistory } from './ticket.entity.js';
 
 const DEPARTMENT_SERVICE_URL = process.env.DEPARTMENT_SERVICE_URL ?? 'http://localhost:3001';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const rpcError = (code: GrpcStatus, message: string) => new RpcException({ code, message });
 
@@ -19,6 +19,13 @@ function requireFields(req: object, ...fields: string[]) {
   }
 }
 
+function requirePhotos(field: string, urls: string[] | undefined) {
+  if (!urls?.length || urls.some((url) => typeof url !== 'string' || !url.trim())) {
+    throw rpcError(GrpcStatus.INVALID_ARGUMENT, `${field} needs at least one photo`);
+  }
+  return urls;
+}
+
 @Injectable()
 export class TicketsService {
   private readonly logger = new Logger('TicketService');
@@ -26,16 +33,17 @@ export class TicketsService {
   constructor(
     @InjectRepository(Ticket) private readonly tickets: Repository<Ticket>,
     @InjectRepository(TicketHistory) private readonly history: Repository<TicketHistory>,
-    private readonly notifications: NotificationStub,
+    @Inject('NOTIFICATION_BROKER') private readonly broker: ClientProxy,
   ) {}
 
-  create(req: Pick<Ticket, 'category' | 'location' | 'description' | 'photoUrl' | 'reporterEmail'>) {
+  create(req: Pick<Ticket, 'category' | 'location' | 'description' | 'photoUrls' | 'reporterEmail'>) {
     requireFields(req, 'category', 'location', 'description', 'reporterEmail');
     const ticket = this.tickets.create({
       category: req.category,
       location: req.location,
       description: req.description,
-      photoUrl: req.photoUrl ?? '',
+      photoUrls: requirePhotos('photoUrls', req.photoUrls),
+      completionPhotoUrls: [],
       reporterEmail: req.reporterEmail,
     });
     return this.setStatus(ticket, 'SUBMITTED', 'Ticket created');
@@ -85,9 +93,10 @@ export class TicketsService {
     return this.setStatus(ticket, 'IN_PROGRESS', 'Work started', ticket.reporterEmail);
   }
 
-  async resolve(req: { id: string; completionPhotoUrl?: string }) {
+  async resolve(req: { id: string; completionPhotoUrls?: string[] }) {
     const ticket = await this.load(req.id, 'IN_PROGRESS');
-    const note = `Resolved, completionPhotoUrl=${req.completionPhotoUrl ?? ''}`;
+    ticket.completionPhotoUrls = requirePhotos('completionPhotoUrls', req.completionPhotoUrls);
+    const note = `Resolved with ${ticket.completionPhotoUrls.length} completion photo(s)`;
     return this.setStatus(ticket, 'RESOLVED', note, ticket.reporterEmail);
   }
 
@@ -105,7 +114,8 @@ export class TicketsService {
 
   private async load(id: string, ...allowedStatuses: string[]) {
     requireFields({ id }, 'id');
-    const ticket = await this.tickets.findOneBy({ id });
+    // Postgres rejects a malformed uuid with an error, so treat it as "no such ticket" here.
+    const ticket = UUID.test(id) ? await this.tickets.findOneBy({ id }) : null;
     if (!ticket) throw rpcError(GrpcStatus.NOT_FOUND, `Ticket ${id} not found`);
     if (allowedStatuses.length && !allowedStatuses.includes(ticket.status)) {
       throw rpcError(
@@ -128,14 +138,27 @@ export class TicketsService {
       await manager.save(TicketHistory, { ticketId: saved.id, fromStatus, toStatus, note, changedAt: now });
       return saved;
     });
-    if (notifyEmail) {
-      try {
-        this.notifications.notify(notifyEmail, saved.id, toStatus);
-      } catch (error) {
-        this.logger.warn(`Notification failed, ignoring: ${error}`);
-      }
-    }
+    if (notifyEmail) this.publishStatusChanged(saved, notifyEmail);
     return saved;
+  }
+
+  // Drops the event on RabbitMQ and returns without waiting for Notification Service.
+  // The event carries everything an email needs, so the consumer never calls back here.
+  private publishStatusChanged(ticket: Ticket, recipientEmail: string) {
+    const event = {
+      ticketId: ticket.id,
+      status: ticket.status,
+      recipientEmail,
+      category: ticket.category,
+      location: ticket.location,
+      description: ticket.description,
+      changedAt: ticket.updatedAt,
+    };
+    this.broker.emit('ticket.status_changed', event).subscribe({
+      next: () => this.logger.log(`Queued ticket.status_changed ticket=${ticket.id} status=${ticket.status}`),
+      // The status change is already committed; a broker failure must not undo it.
+      error: (error) => this.logger.warn(`Notification not queued, ignoring: ${error}`),
+    });
   }
 
   private async fetchDepartment(departmentId: string): Promise<{ id: string; name: string; contactEmail: string }> {
@@ -148,7 +171,10 @@ export class TicketsService {
       throw rpcError(GrpcStatus.UNAVAILABLE, 'Department Service unreachable');
     }
     this.logger.log(`GET ${url} -> ${response.status}`);
-    if (response.status === 404) throw rpcError(GrpcStatus.NOT_FOUND, `Department ${departmentId} not found`);
+    // 400 is Department Service refusing an id that is not a uuid, which also means "no such department".
+    if (response.status === 404 || response.status === 400) {
+      throw rpcError(GrpcStatus.NOT_FOUND, `Department ${departmentId} not found`);
+    }
     if (!response.ok) throw rpcError(GrpcStatus.UNAVAILABLE, `Department Service returned ${response.status}`);
     return (await response.json()) as { id: string; name: string; contactEmail: string };
   }

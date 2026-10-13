@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Department } from './department.entity.js';
@@ -8,8 +7,8 @@ import { DepartmentsService } from './departments.service.js';
 @Module({
   imports: [
     TypeOrmModule.forRoot({
-      type: 'better-sqlite3',
-      database: join(import.meta.dirname, '..', 'department.sqlite'),
+      type: 'postgres',
+      url: process.env.DEPARTMENT_DATABASE_URL ?? 'postgresql://fondue:fondue@localhost:5433/department',
       entities: [Department],
       synchronize: true,
     }),

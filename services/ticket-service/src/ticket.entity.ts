@@ -16,8 +16,11 @@ export class Ticket {
   @Column()
   description: string;
 
-  @Column({ default: '' })
-  photoUrl: string;
+  @Column('text', { array: true, default: () => "'{}'" })
+  photoUrls: string[];
+
+  @Column('text', { array: true, default: () => "'{}'" })
+  completionPhotoUrls: string[];
 
   @Column()
   reporterEmail: string;

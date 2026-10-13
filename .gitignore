@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.sqlite
 demo/.ids
+.env
+services/api-gateway/uploads/

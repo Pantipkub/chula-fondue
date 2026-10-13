@@ -1,0 +1,21 @@
+# Local infrastructure. RabbitMQ always runs here; Postgres is only used when the
+# *_DATABASE_URL variables are not set in .env (otherwise the services use Neon).
+services:
+  rabbitmq:
+    image: rabbitmq:4.3.6-management
+    ports:
+      - '5672:5672' # services connect here
+      - '15672:15672' # management page, guest / guest
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: fondue
+      POSTGRES_PASSWORD: fondue
+    ports:
+      - '5433:5432'
+    volumes:
+      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+      - postgres-data:/var/lib/postgresql
+
+volumes:
+  postgres-data:

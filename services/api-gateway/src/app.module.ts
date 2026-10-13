@@ -1,6 +1,9 @@
 import { join } from 'node:path';
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { AuthController } from './auth.controller.js';
+import { AuthGuard } from './auth.js';
 import { DepartmentsController } from './departments.controller.js';
 import { TicketsController } from './tickets.controller.js';
 
@@ -20,6 +23,7 @@ import { TicketsController } from './tickets.controller.js';
       },
     ]),
   ],
-  controllers: [TicketsController, DepartmentsController],
+  controllers: [AuthController, TicketsController, DepartmentsController],
+  providers: [{ provide: APP_GUARD, useClass: AuthGuard }],
 })
 export class AppModule {}

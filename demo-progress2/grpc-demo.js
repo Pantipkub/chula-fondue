@@ -1,4 +1,5 @@
 // gRPC CRUD demo on ticket-service (checks G1-G8). Stands in for grpcurl and loads the same proto file.
+// Safe to re-run: the tickets belong to a reporter address that is unique per run.
 const { existsSync, readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const grpc = require('@grpc/grpc-js');
@@ -17,6 +18,8 @@ const definition = protoLoader.loadSync(join(__dirname, '../proto/ticket.proto')
 const { ticket } = grpc.loadPackageDefinition(definition);
 const address = process.env.TICKET_SERVICE_URL ?? 'localhost:50051';
 const client = new ticket.TicketService(address, grpc.credentials.createInsecure());
+
+const reporterEmail = `student-${Date.now()}@student.chula.ac.th`;
 
 let failed = false;
 const step = (title) => console.log(`\n=== ${title} ===`);
@@ -45,19 +48,20 @@ async function main() {
     category: 'Electrical',
     location: 'ENG3 room 315',
     description: 'Ceiling light is flickering',
-    photoUrl: 'https://example.com/photos/light.jpg',
-    reporterEmail: 'student1@student.chula.ac.th',
+    photoUrls: ['https://example.com/photos/light.jpg'],
+    reporterEmail,
   });
   const t2 = await call('OK', 'CreateTicket', {
     category: 'Grounds',
     location: 'Walkway behind the Central Library',
     description: 'Broken paving stone',
-    reporterEmail: 'student2@student.chula.ac.th',
+    photoUrls: ['https://example.com/photos/paving-1.jpg', 'https://example.com/photos/paving-2.jpg'],
+    reporterEmail,
   });
   check('both tickets are SUBMITTED', t1?.status === 'SUBMITTED' && t2?.status === 'SUBMITTED');
 
   step('G2 ListTickets');
-  let list = await call('OK', 'ListTickets', {});
+  let list = await call('OK', 'ListTickets', { reporterEmail });
   check('lists both tickets', list?.tickets.length === 2);
 
   step('G3 AssignTicket T1 to department A (watch the ticket-service log)');
@@ -81,7 +85,7 @@ async function main() {
   check('T2 is CANCELLED', cancelled?.status === 'CANCELLED');
 
   step('G7 ListTickets');
-  list = await call('OK', 'ListTickets', {});
+  list = await call('OK', 'ListTickets', { reporterEmail });
   check('lists only T1', list?.tickets.length === 1 && list.tickets[0].id === t1.id);
 
   step('G8 CancelTicket T1 (not allowed once ASSIGNED)');

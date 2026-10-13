@@ -42,7 +42,7 @@ export class TicketsController {
   }
 
   @GrpcMethod('TicketService', 'ResolveTicket')
-  resolveTicket(req: { id: string; completionPhotoUrl?: string }) {
+  resolveTicket(req: { id: string; completionPhotoUrls?: string[] }) {
     return this.tickets.resolve(req);
   }
 

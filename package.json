@@ -6,10 +6,13 @@
   ],
   "scripts": {
     "install:all": "npm install",
-    "dev": "concurrently -n department,ticket,gateway -c blue,green,magenta \"npm start -w department-service\" \"npm start -w ticket-service\" \"npm start -w api-gateway\""
+    "dev": "concurrently -n department,auth,ticket,notification,gateway -c blue,cyan,green,yellow,magenta \"npm start -w department-service\" \"npm start -w auth-service\" \"npm start -w ticket-service\" \"npm start -w notification-service\" \"npm start -w api-gateway\"",
+    "dev:no-notification": "concurrently -n department,auth,ticket,gateway -c blue,cyan,green,magenta \"npm start -w department-service\" \"npm start -w auth-service\" \"npm start -w ticket-service\" \"npm start -w api-gateway\"",
+    "notification": "npm start -w notification-service"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.20.5",
     "concurrently": "^10.0.5",
     "typescript": "^7.0.2"

@@ -8,8 +8,6 @@ service TicketService {
   rpc GetTicketHistory (TicketIdRequest) returns (TicketHistoryResponse);
   rpc AssignTicket (AssignTicketRequest) returns (Ticket);
   rpc CancelTicket (TicketIdRequest) returns (Ticket);
-
-  // Optional: implement only after everything in section 8 passes.
   rpc RejectTicket (ReasonRequest) returns (Ticket);
   rpc StartProgress (TicketIdRequest) returns (Ticket);
   rpc ResolveTicket (ResolveTicketRequest) returns (Ticket);
@@ -22,7 +20,7 @@ message Ticket {
   string category = 2;
   string location = 3;
   string description = 4;
-  string photo_url = 5;
+  repeated string photo_urls = 5;             // photos of the issue
   string reporter_email = 6;
   string status = 7;
   string department_id = 8;
@@ -30,6 +28,7 @@ message Ticket {
   string reason = 10;
   string created_at = 11;
   string updated_at = 12;
+  repeated string completion_photo_urls = 13; // proof photos added when resolving
 }
 
 message HistoryEntry {
@@ -43,7 +42,7 @@ message CreateTicketRequest {
   string category = 1;
   string location = 2;
   string description = 3;
-  string photo_url = 4;
+  repeated string photo_urls = 4;   // at least one
   string reporter_email = 5;
 }
 
@@ -79,5 +78,5 @@ message ReasonRequest {
 
 message ResolveTicketRequest {
   string id = 1;
-  string completion_photo_url = 2;
+  repeated string completion_photo_urls = 2;   // at least one
 }
