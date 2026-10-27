@@ -1,0 +1,76 @@
+Evidence log: demo-progress3/evidence/reliability-20261027-201502.log
+Date: 2026-10-27 20:15:02 +0700   Branch: feature/progress-3-discovery-nfr   Commit: 37bc79e
+
+=== N1 Stop Notification Service (the consumer). RabbitMQ and Ticket Service keep running ===
+$ docker compose stop notification-service
+ Container chula-fondue-notification-service-1 Stopping 
+ Container chula-fondue-notification-service-1 Stopped 
+messages in the queue before: 0
+
+=== N2 A guest reports an issue and the Admin assigns it while nobody consumes notifications ===
+$ curl -s -X POST http://localhost:3000/auth/guest
+{"accessToken":"eyJhbGciOiJI..."}
+-> HTTP 200 (expected 200)
+$ curl -s -X POST http://localhost:3000/tickets -F 'category=Electrical' -F 'location=ENG4 room 401' -F 'description=Flickering light' -F 'contactEmail=visitor-1793106902@example.com' -F 'photos=@../demo-progress2/photos/issue-1.png' -H 'Authorization: Bearer <Guest token>'
+{"photoUrls":["http://localhost:3000/uploads/17ef41aa-3c7a-46bd-8920-9a171512e009.png"],"completionPhotoUrls":[],"id":"2c1fc7a4-49c9-45bc-a0f3-f077abef394c","category":"Electrical","location":"ENG4 room 401","description":"Flickering light","reporterEmail":"visitor-1793106902@example.com","status":"SUBMITTED","departmentId":"","departmentName":"","reason":"","createdAt":"2026-10-27T13:15:04.311Z","updatedAt":"2026-10-27T13:15:04.311Z"}
+-> HTTP 201 (expected 201)
+$ curl -s -X POST http://localhost:3000/auth/login -H 'Content-Type: application/json' -d '{"email":"admin@chula.ac.th","password":"***"}'
+{"accessToken":"eyJhbGciOiJI...","user":{"id":"ed4253d7-8739-4dc7-95a6-5acf2dd8d93a","email":"admin@chula.ac.th","role":"ADMIN","departmentId":""}}
+-> HTTP 200 (expected 200)
+$ curl -s -X POST http://localhost:3000/departments -H 'Content-Type: application/json' -d '{"name":"Electrical Team 1793106902","contactEmail":"electrical-1793106902@chula.ac.th"}' -H 'Authorization: Bearer <Admin token>'
+{"name":"Electrical Team 1793106902","contactEmail":"electrical-1793106902@chula.ac.th","buildings":[],"id":"c71e4b5e-94e0-41a8-85b7-9e923953d599","createdAt":"2026-10-27T13:15:04.443Z","updatedAt":"2026-10-27T13:15:04.443Z"}
+-> HTTP 201 (expected 201)
+$ curl -s -X POST http://localhost:3000/tickets/2c1fc7a4-49c9-45bc-a0f3-f077abef394c/assign -H 'X-Request-Id: assign-1793106902' -H 'Content-Type: application/json' -d '{"departmentId":"c71e4b5e-94e0-41a8-85b7-9e923953d599"}' -H 'Authorization: Bearer <Admin token>'
+{"photoUrls":["http://localhost:3000/uploads/17ef41aa-3c7a-46bd-8920-9a171512e009.png"],"completionPhotoUrls":[],"id":"2c1fc7a4-49c9-45bc-a0f3-f077abef394c","category":"Electrical","location":"ENG4 room 401","description":"Flickering light","reporterEmail":"visitor-1793106902@example.com","status":"ASSIGNED","departmentId":"c71e4b5e-94e0-41a8-85b7-9e923953d599","departmentName":"Electrical Team 1793106902","reason":"","createdAt":"2026-10-27T13:15:04.311Z","updatedAt":"2026-10-27T13:15:04.493Z"}
+-> HTTP 200 (expected 200)
+   ok     ticket is ASSIGNED although Notification Service is down
+
+=== N3 The event waits in RabbitMQ ===
+$ docker compose exec rabbitmq rabbitmqctl list_queues name messages
+-> notifications: 1 message(s) in the queue
+   ok     one more message is waiting than before
+
+=== N4 Start Notification Service again and wait until every message is processed and acknowledged ===
+$ docker compose start notification-service
+ Container chula-fondue-rabbitmq-1 Waiting 
+ Container chula-fondue-rabbitmq-1 Healthy 
+ Container chula-fondue-notification-service-1 Starting 
+ Container chula-fondue-notification-service-1 Started 
+-> queue empty after 1716 ms
+   ok     queue drained within 60 s
+
+=== N5 Notification Service recorded the event that waited ===
+$ docker compose logs notification-service | grep ticket=2c1fc7a4-49c9-45bc-a0f3-f077abef394c
+notification-service-1  | [32m[Nest] 1  - [39m10/27/2026, 1:15:07 PM [32m    LOG[39m [38;5;3m[NotificationService] [39m[32mRecorded to=electrical-1793106902@chula.ac.th eventId=58b9cc60-61f3-4cb2-a023-636df5d7a0a1 requestId=assign-1793106902 ticket=2c1fc7a4-49c9-45bc-a0f3-f077abef394c status=ASSIGNED[39m
+   ok     notification-service logged 'Recorded ... ticket=2c1fc7a4-49c9-45bc-a0f3-f077abef394c'
+$ node demo-progress2/show-notifications.js 2c1fc7a4-49c9-45bc-a0f3-f077abef394c
+$ db.notifications.find({ ticketId: "2c1fc7a4-49c9-45bc-a0f3-f077abef394c" })
+[
+  {
+    "eventId": "58b9cc60-61f3-4cb2-a023-636df5d7a0a1",
+    "category": "Electrical",
+    "changedAt": "2026-10-27T13:15:04.493Z",
+    "delivery": "RECORDED",
+    "description": "Flickering light",
+    "location": "ENG4 room 401",
+    "receivedAt": "2026-10-27T13:15:07.764Z",
+    "recipientEmail": "electrical-1793106902@chula.ac.th",
+    "requestId": "assign-1793106902",
+    "status": "ASSIGNED",
+    "ticketId": "2c1fc7a4-49c9-45bc-a0f3-f077abef394c"
+  }
+]
+-> 1 notification(s) in MongoDB (expected 1)
+
+=== N6 One request id, followed from the gateway through Ticket Service to Notification Service ===
+$ docker compose logs api-gateway ticket-service notification-service | grep requestId=assign-1793106902
+api-gateway-1  | [32m[Nest] 1  - [39m10/27/2026, 1:15:04 PM [32m    LOG[39m [38;5;3m[HTTP] [39m[32mPOST /tickets/2c1fc7a4-49c9-45bc-a0f3-f077abef394c/assign -> 200 10.9ms requestId=assign-1793106902[39m
+ticket-service-1  | [32m[Nest] 1  - [39m10/27/2026, 1:15:04 PM [32m    LOG[39m [38;5;3m[TicketRpc] [39m[32mAssignTicket ok 8.6ms requestId=assign-1793106902[39m
+ticket-service-1  | [32m[Nest] 1  - [39m10/27/2026, 1:15:04 PM [32m    LOG[39m [38;5;3m[TicketService] [39m[32mQueued ticket.status_changed eventId=58b9cc60-61f3-4cb2-a023-636df5d7a0a1 requestId=assign-1793106902 ticket=2c1fc7a4-49c9-45bc-a0f3-f077abef394c status=ASSIGNED[39m
+notification-service-1  | [32m[Nest] 1  - [39m10/27/2026, 1:15:07 PM [32m    LOG[39m [38;5;3m[NotificationService] [39m[32mRecorded to=electrical-1793106902@chula.ac.th eventId=58b9cc60-61f3-4cb2-a023-636df5d7a0a1 requestId=assign-1793106902 ticket=2c1fc7a4-49c9-45bc-a0f3-f077abef394c status=ASSIGNED[39m
+   ok     api-gateway logged requestId=assign-1793106902
+   ok     ticket-service logged requestId=assign-1793106902
+   ok     notification-service logged requestId=assign-1793106902
+
+ALL CHECKS PASSED
+Saved to demo-progress3/evidence/reliability-20261027-201502.log

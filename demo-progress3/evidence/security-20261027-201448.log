@@ -1,0 +1,122 @@
+Evidence log: demo-progress3/evidence/security-20261027-201448.log
+Date: 2026-10-27 20:14:48 +0700   Branch: feature/progress-3-discovery-nfr   Commit: 37bc79e
+
+=== Setup: Admin, two departments, one Staff each, two reporters, one ticket per reporter ===
+$ curl -s -X POST http://localhost:3000/auth/login -H 'Content-Type: application/json' -d '{"email":"admin@chula.ac.th","password":"***"}'
+{"accessToken":"eyJhbGciOiJI...","user":{"id":"ed4253d7-8739-4dc7-95a6-5acf2dd8d93a","email":"admin@chula.ac.th","role":"ADMIN","departmentId":""}}
+-> HTTP 200 (expected 200)
+$ curl -s -X POST http://localhost:3000/departments -H 'Content-Type: application/json' -d '{"name":"Sec Dept A 1793106888","contactEmail":"sec-a-1793106888@chula.ac.th"}' -H 'Authorization: Bearer <Admin token>'
+{"name":"Sec Dept A 1793106888","contactEmail":"sec-a-1793106888@chula.ac.th","buildings":[],"id":"93ef144c-c01c-49c7-a650-de8336fe1a0a","createdAt":"2026-10-27T13:14:48.677Z","updatedAt":"2026-10-27T13:14:48.677Z"}
+-> HTTP 201 (expected 201)
+$ curl -s -X POST http://localhost:3000/departments -H 'Content-Type: application/json' -d '{"name":"Sec Dept B 1793106888","contactEmail":"sec-b-1793106888@chula.ac.th"}' -H 'Authorization: Bearer <Admin token>'
+{"name":"Sec Dept B 1793106888","contactEmail":"sec-b-1793106888@chula.ac.th","buildings":[],"id":"e212f333-a6b6-426e-aaf5-f30eca516dbf","createdAt":"2026-10-27T13:14:48.725Z","updatedAt":"2026-10-27T13:14:48.725Z"}
+-> HTTP 201 (expected 201)
+$ curl -s -X POST http://localhost:3000/auth/users -H 'Content-Type: application/json' -d '{"email":"sec-staff-a-1793106888@chula.ac.th","password":"***","role":"STAFF","departmentId":"93ef144c-c01c-49c7-a650-de8336fe1a0a"}' -H 'Authorization: Bearer <Admin token>'
+{"id":"07d2b857-cc2c-41f0-991b-6dc65cb6e8fe","email":"sec-staff-a-1793106888@chula.ac.th","role":"STAFF","departmentId":"93ef144c-c01c-49c7-a650-de8336fe1a0a"}
+-> HTTP 201 (expected 201)
+$ curl -s -X POST http://localhost:3000/auth/users -H 'Content-Type: application/json' -d '{"email":"sec-staff-b-1793106888@chula.ac.th","password":"***","role":"STAFF","departmentId":"e212f333-a6b6-426e-aaf5-f30eca516dbf"}' -H 'Authorization: Bearer <Admin token>'
+{"id":"64eb02c3-adfc-4f38-8f33-7967615083d3","email":"sec-staff-b-1793106888@chula.ac.th","role":"STAFF","departmentId":"e212f333-a6b6-426e-aaf5-f30eca516dbf"}
+-> HTTP 201 (expected 201)
+$ curl -s -X POST http://localhost:3000/auth/register -H 'Content-Type: application/json' -d '{"email":"sec-reporter-1-1793106888@student.chula.ac.th","password":"***"}'
+{"id":"7da9e3ca-0cf3-4003-9e97-d2bc88c27b85","email":"sec-reporter-1-1793106888@student.chula.ac.th","role":"REPORTER","departmentId":""}
+-> HTTP 201 (expected 201)
+$ curl -s -X POST http://localhost:3000/auth/register -H 'Content-Type: application/json' -d '{"email":"sec-reporter-2-1793106888@student.chula.ac.th","password":"***"}'
+{"id":"9d6e25d8-04b5-478b-a550-7faf2d4e5ea2","email":"sec-reporter-2-1793106888@student.chula.ac.th","role":"REPORTER","departmentId":""}
+-> HTTP 201 (expected 201)
+$ curl -s -X POST http://localhost:3000/auth/login -H 'Content-Type: application/json' -d '{"email":"sec-staff-a-1793106888@chula.ac.th","password":"***"}'
+{"accessToken":"eyJhbGciOiJI...","user":{"id":"07d2b857-cc2c-41f0-991b-6dc65cb6e8fe","email":"sec-staff-a-1793106888@chula.ac.th","role":"STAFF","departmentId":"93ef144c-c01c-49c7-a650-de8336fe1a0a"}}
+-> HTTP 200 (expected 200)
+$ curl -s -X POST http://localhost:3000/auth/login -H 'Content-Type: application/json' -d '{"email":"sec-staff-b-1793106888@chula.ac.th","password":"***"}'
+{"accessToken":"eyJhbGciOiJI...","user":{"id":"64eb02c3-adfc-4f38-8f33-7967615083d3","email":"sec-staff-b-1793106888@chula.ac.th","role":"STAFF","departmentId":"e212f333-a6b6-426e-aaf5-f30eca516dbf"}}
+-> HTTP 200 (expected 200)
+$ curl -s -X POST http://localhost:3000/auth/login -H 'Content-Type: application/json' -d '{"email":"sec-reporter-1-1793106888@student.chula.ac.th","password":"***"}'
+{"accessToken":"eyJhbGciOiJI...","user":{"id":"7da9e3ca-0cf3-4003-9e97-d2bc88c27b85","email":"sec-reporter-1-1793106888@student.chula.ac.th","role":"REPORTER","departmentId":""}}
+-> HTTP 200 (expected 200)
+$ curl -s -X POST http://localhost:3000/auth/login -H 'Content-Type: application/json' -d '{"email":"sec-reporter-2-1793106888@student.chula.ac.th","password":"***"}'
+{"accessToken":"eyJhbGciOiJI...","user":{"id":"9d6e25d8-04b5-478b-a550-7faf2d4e5ea2","email":"sec-reporter-2-1793106888@student.chula.ac.th","role":"REPORTER","departmentId":""}}
+-> HTTP 200 (expected 200)
+$ curl -s -X POST http://localhost:3000/tickets -F 'category=Plumbing' -F 'location=ENG1 restroom' -F 'description=Leaking tap' -F 'photos=@../demo-progress2/photos/issue-1.png' -H 'Authorization: Bearer <Reporter1 token>'
+{"photoUrls":["http://localhost:3000/uploads/897943f9-0f81-4a64-a181-448fa3998dbd.png"],"completionPhotoUrls":[],"id":"a7aaa2ca-83c1-4ac0-9216-f083d011f5f7","category":"Plumbing","location":"ENG1 restroom","description":"Leaking tap","reporterEmail":"sec-reporter-1-1793106888@student.chula.ac.th","status":"SUBMITTED","departmentId":"","departmentName":"","reason":"","createdAt":"2026-10-27T13:14:49.250Z","updatedAt":"2026-10-27T13:14:49.250Z"}
+-> HTTP 201 (expected 201)
+$ curl -s -X POST http://localhost:3000/tickets -F 'category=Cleaning' -F 'location=ENG2 hall' -F 'description=Spilled paint' -F 'photos=@../demo-progress2/photos/issue-1.png' -H 'Authorization: Bearer <Reporter2 token>'
+{"photoUrls":["http://localhost:3000/uploads/64af4530-dde6-470a-a9af-1c5d077306f6.png"],"completionPhotoUrls":[],"id":"666efdbc-14c9-41d1-80b3-ea531ccb8e20","category":"Cleaning","location":"ENG2 hall","description":"Spilled paint","reporterEmail":"sec-reporter-2-1793106888@student.chula.ac.th","status":"SUBMITTED","departmentId":"","departmentName":"","reason":"","createdAt":"2026-10-27T13:14:49.307Z","updatedAt":"2026-10-27T13:14:49.307Z"}
+-> HTTP 201 (expected 201)
+
+=== S1 No token ===
+$ curl -s -X GET http://localhost:3000/tickets
+{"message":"Missing bearer token","error":"Unauthorized","statusCode":401}
+-> HTTP 401 (expected 401)
+
+=== S2 Forged token (signed with another secret) ===
+$ curl -s -X GET http://localhost:3000/tickets -H 'Authorization: Bearer <Forged token>'
+{"message":"Invalid or expired token","error":"Unauthorized","statusCode":401}
+-> HTTP 401 (expected 401)
+
+=== S3 Expired token (correct signature, expired an hour ago) ===
+$ curl -s -X GET http://localhost:3000/tickets -H 'Authorization: Bearer <Expired token>'
+{"message":"Invalid or expired token","error":"Unauthorized","statusCode":401}
+-> HTTP 401 (expected 401)
+
+=== S4 A Reporter tries to assign a ticket (Admin only) ===
+$ curl -s -X POST http://localhost:3000/tickets/a7aaa2ca-83c1-4ac0-9216-f083d011f5f7/assign -H 'Content-Type: application/json' -d '{"departmentId":"93ef144c-c01c-49c7-a650-de8336fe1a0a"}' -H 'Authorization: Bearer <Reporter1 token>'
+{"message":"This action requires role ADMIN","error":"Forbidden","statusCode":403}
+-> HTTP 403 (expected 403)
+   ok     ticket is still SUBMITTED
+
+=== S5 A Reporter tries to manage departments and create Staff accounts (Admin only) ===
+$ curl -s -X POST http://localhost:3000/departments -H 'Content-Type: application/json' -d '{"name":"Rogue 1793106888","contactEmail":"rogue@chula.ac.th"}' -H 'Authorization: Bearer <Reporter1 token>'
+{"message":"This action requires role ADMIN","error":"Forbidden","statusCode":403}
+-> HTTP 403 (expected 403)
+$ curl -s -X POST http://localhost:3000/auth/users -H 'Content-Type: application/json' -d '{"email":"rogue-1793106888@chula.ac.th","password":"***","role":"ADMIN"}' -H 'Authorization: Bearer <Reporter1 token>'
+{"message":"This action requires role ADMIN","error":"Forbidden","statusCode":403}
+-> HTTP 403 (expected 403)
+
+=== S6 A Reporter reads another reporter's ticket ===
+$ curl -s -X GET http://localhost:3000/tickets/666efdbc-14c9-41d1-80b3-ea531ccb8e20/history -H 'Authorization: Bearer <Reporter1 token>'
+{"message":"This ticket is not yours","error":"Forbidden","statusCode":403}
+-> HTTP 403 (expected 403)
+$ curl -s -X GET http://localhost:3000/tickets/a7aaa2ca-83c1-4ac0-9216-f083d011f5f7/history -H 'Authorization: Bearer <Reporter1 token>'
+{"history":[{"fromStatus":"","toStatus":"SUBMITTED","note":"Ticket created","changedAt":"2026-10-27T13:14:49.250Z"}],"ticket":{"photoUrls":["http://localhost:3000/uploads/897943f9-0f81-4a64-a181-448fa3998dbd.png"],"completionPhotoUrls":[],"id":"a7aaa2ca-83c1-4ac0-9216-f083d011f5f7","category":"Plumbing","location":"ENG1 restroom","description":"Leaking tap","reporterEmail":"sec-reporter-1-1793106888@student.chula.ac.th","status":"SUBMITTED","departmentId":"","departmentName":"","reason":"","createdAt":"2026-10-27T13:14:49.250Z","updatedAt":"2026-10-27T13:14:49.250Z"}}
+-> HTTP 200 (expected 200)
+
+=== S7 Admin assigns ticket 1 to Department A; Staff of Department B tries to read and start it ===
+$ curl -s -X POST http://localhost:3000/tickets/a7aaa2ca-83c1-4ac0-9216-f083d011f5f7/assign -H 'Content-Type: application/json' -d '{"departmentId":"93ef144c-c01c-49c7-a650-de8336fe1a0a"}' -H 'Authorization: Bearer <Admin token>'
+{"photoUrls":["http://localhost:3000/uploads/897943f9-0f81-4a64-a181-448fa3998dbd.png"],"completionPhotoUrls":[],"id":"a7aaa2ca-83c1-4ac0-9216-f083d011f5f7","category":"Plumbing","location":"ENG1 restroom","description":"Leaking tap","reporterEmail":"sec-reporter-1-1793106888@student.chula.ac.th","status":"ASSIGNED","departmentId":"93ef144c-c01c-49c7-a650-de8336fe1a0a","departmentName":"Sec Dept A 1793106888","reason":"","createdAt":"2026-10-27T13:14:49.250Z","updatedAt":"2026-10-27T13:14:49.610Z"}
+-> HTTP 200 (expected 200)
+$ curl -s -X GET http://localhost:3000/tickets/a7aaa2ca-83c1-4ac0-9216-f083d011f5f7/history -H 'Authorization: Bearer <StaffB token>'
+{"message":"This ticket is not assigned to your department","error":"Forbidden","statusCode":403}
+-> HTTP 403 (expected 403)
+$ curl -s -X POST http://localhost:3000/tickets/a7aaa2ca-83c1-4ac0-9216-f083d011f5f7/start -H 'Authorization: Bearer <StaffB token>'
+{"message":"This ticket is not assigned to your department","error":"Forbidden","statusCode":403}
+-> HTTP 403 (expected 403)
+   ok     ticket is still ASSIGNED
+$ curl -s -X GET http://localhost:3000/tickets/a7aaa2ca-83c1-4ac0-9216-f083d011f5f7/history -H 'Authorization: Bearer <StaffA token>'
+{"history":[{"fromStatus":"","toStatus":"SUBMITTED","note":"Ticket created","changedAt":"2026-10-27T13:14:49.250Z"},{"fromStatus":"SUBMITTED","toStatus":"ASSIGNED","note":"Assigned to Sec Dept A 1793106888","changedAt":"2026-10-27T13:14:49.610Z"}],"ticket":{"photoUrls":["http://localhost:3000/uploads/897943f9-0f81-4a64-a181-448fa3998dbd.png"],"completionPhotoUrls":[],"id":"a7aaa2ca-83c1-4ac0-9216-f083d011f5f7","category":"Plumbing","location":"ENG1 restroom","description":"Leaking tap","reporterEmail":"sec-reporter-1-1793106888@student.chula.ac.th","status":"ASSIGNED","departmentId":"93ef144c-c01c-49c7-a650-de8336fe1a0a","departmentName":"Sec Dept A 1793106888","reason":"","createdAt":"2026-10-27T13:14:49.250Z","updatedAt":"2026-10-27T13:14:49.610Z"}}
+-> HTTP 200 (expected 200)
+
+=== S8 Staff B's ticket list contains only Department B's tickets ===
+$ curl -s -X GET http://localhost:3000/tickets -H 'Authorization: Bearer <StaffB token>'
+{"tickets":[]}
+-> HTTP 200 (expected 200)
+   ok     ticket 1 is not in Staff B's list
+
+=== S9 A Guest token cannot list tickets ===
+$ curl -s -X POST http://localhost:3000/auth/guest
+{"accessToken":"eyJhbGciOiJI..."}
+-> HTTP 200 (expected 200)
+$ curl -s -X GET http://localhost:3000/tickets -H 'Authorization: Bearer <Guest token>'
+{"message":"This action requires role ADMIN or STAFF or REPORTER","error":"Forbidden","statusCode":403}
+-> HTTP 403 (expected 403)
+
+=== S10 The services behind the gateway cannot be reached from outside the Docker network ===
+$ curl -s -m 3 http://localhost:3001/departments
+   ok     http://localhost:3001/departments is unreachable (got HTTP 000; 000 = no connection)
+$ curl -s -m 3 http://localhost:3002/auth/guest
+   ok     http://localhost:3002/auth/guest is unreachable (got HTTP 000; 000 = no connection)
+$ curl -s -m 3 http://localhost:8081/health
+   ok     http://localhost:8081/health is unreachable (got HTTP 000; 000 = no connection)
+$ node -e 'net.connect(50051)'   # gRPC port of ticket-service
+   ok     gRPC port 50051 is closed (got closed)
+
+ALL CHECKS PASSED
+Saved to demo-progress3/evidence/security-20261027-201448.log

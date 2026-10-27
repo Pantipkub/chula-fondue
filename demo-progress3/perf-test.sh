@@ -23,7 +23,9 @@ if command -v k6 >/dev/null; then
     --summary-export="demo-progress3/$SUMMARY" perf/ticket-history.k6.js
 else
   # Inside the Docker network the gateway is http://api-gateway:3000.
-  docker run --rm -i --network fondue-backend -v "$PWD:/work" -w /work grafana/k6:1.8.2 run \
+  # Git Bash on Windows rewrites paths like /work; MSYS_NO_PATHCONV stops that and pwd -W gives C:/... for -v.
+  HOST_DIR=$(pwd -W 2>/dev/null || pwd)
+  MSYS_NO_PATHCONV=1 docker run --rm -i --network fondue-backend -v "$HOST_DIR:/work" -w /work grafana/k6:1.8.2 run \
     -e BASE_URL="${K6_BASE_URL:-http://api-gateway:3000}" -e VUS="${VUS:-50}" -e DURATION="${DURATION:-60s}" \
     --summary-export="demo-progress3/$SUMMARY" perf/ticket-history.k6.js
 fi

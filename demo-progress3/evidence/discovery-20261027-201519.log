@@ -1,0 +1,64 @@
+Evidence log: demo-progress3/evidence/discovery-20261027-201519.log
+Date: 2026-10-27 20:15:19 +0700   Branch: feature/progress-3-discovery-nfr   Commit: 37bc79e
+
+=== D1 The system works: Admin lists tickets through the gateway ===
+$ curl -s -X POST http://localhost:3000/auth/login -H 'Content-Type: application/json' -d '{"email":"admin@chula.ac.th","password":"***"}'
+{"accessToken":"eyJhbGciOiJI...","user":{"id":"ed4253d7-8739-4dc7-95a6-5acf2dd8d93a","email":"admin@chula.ac.th","role":"ADMIN","departmentId":""}}
+-> HTTP 200 (expected 200)
+$ curl -s -X GET http://localhost:3000/tickets -H 'Authorization: Bearer <Admin token>'
+{"tickets":[{"photoUrls":["http://localhost:3000/uploads/17ef41aa-3c7a-46bd-8920-9a171512e009.png"],"completionPhotoUrls":[],"id":"2c1fc7a4-49c9-45bc-a0f3-f077abef394c","category":"Electrical","location":"ENG4 room 401","description":"Flickering light","reporterEmail":"visitor-1793106902@example.com","status":"ASSIGNED","departmentId":"c71e4b5e-94e0-41a8-85b7-9e923953d599","departmentName":"Electrical Team 1793106902","reason":"","createdAt":"2026-10-27T13:15:04.311Z","updatedAt":"2026-10-27T13:15:04.493Z"},{"photoUrls":["http://localhost:3000/uploads/64af4530-dde6-470a-a9af-1c5d077306f6.png"],"completionPhotoUrls":[],"id":"666efdbc-14c9-41d1-80b3-ea531ccb8e20","category":"Cleaning","location":"ENG2 hall","description":"Spilled paint","reporterEmail":"sec-reporter-2-1793106888@student.chula.ac.th","status":"SUBMITTED","departmentId":"","departmentName":"","reason":"","createdAt":"2026-10-27T13:14:49.307Z","updatedAt":"2026-10-27T13:14:49.307Z"},{"photoUrls":["http://localhost:3000/uploads/897943f9-0f81-4a64-a181-448fa3998dbd.png"],"completionPhotoUrls":[],"id":"a7aaa2ca-83c1-4ac0-9216-f083d011f5f7","category":"Plumbing","location":"ENG1 restroom","description":"Leaking tap","reporterEmail":"sec-reporter-1-1793106888@student.chula.ac.th","status":"ASSIGNED","departmentId":"93ef144c-c01c-49c7-a650-de8336fe1a0a","departmentName":"Sec Dept A 1793106888","reason":"","createdAt":"2026-10-27T13:14:49.250Z","updatedAt":"2026-10-27T13:14:49.610Z"}]}
+-> HTTP 200 (expected 200)
+
+=== D2 The gateway knows Ticket Service only by name; Docker DNS turns the name into the current IP ===
+$ docker compose exec api-gateway printenv TICKET_SERVICE_URL AUTH_SERVICE_URL DEPARTMENT_SERVICE_URL
+TICKET_SERVICE_URL=dns:///ticket-service:50051
+AUTH_SERVICE_URL=http://auth-service:3002
+DEPARTMENT_SERVICE_URL=http://department-service:3001
+$ docker compose exec -T api-gateway node -e require('dns').lookup('ticket-service', (e, a) => console.log('ticket-service ->', e ? e.code : a))
+ticket-service -> 172.23.0.8
+ticket-service container IP: 172.23.0.8
+
+=== D3 Remove the ticket-service container ===
+$ docker compose rm --stop --force ticket-service
+ Container chula-fondue-ticket-service-1 Stopping 
+ Container chula-fondue-ticket-service-1 Stopped 
+Going to remove chula-fondue-ticket-service-1
+ Container chula-fondue-ticket-service-1 Removing 
+ Container chula-fondue-ticket-service-1 Removed 
+placeholder container holds 172.23.0.8
+
+=== D4 While Ticket Service is gone, the gateway answers with a controlled error, never a hang ===
+$ curl -s -X GET http://localhost:3000/tickets -H 'Authorization: Bearer <Admin token>'
+{"statusCode":503,"message":"Ticket Service unavailable, try again shortly"}
+-> HTTP 503 after 0.002900s
+   ok     503 or 504 (got 503)
+   ok     answered within the 5 s gRPC deadline + 1 s
+$ curl -s -X GET http://localhost:3000/health/ready -H 'Authorization: Bearer <Admin token>'
+{"status":"not_ready","checks":{"auth-service":"up","department-service":"up","ticket-service":"down"}}
+-> HTTP 503 (expected 503)
+   ok     readiness names ticket-service as down
+
+=== D5 Start a new ticket-service container (the gateway is not touched) and time the recovery ===
+$ docker compose up -d --no-deps ticket-service
+ Container chula-fondue-ticket-service-1 Creating 
+ Container chula-fondue-ticket-service-1 Created 
+ Container chula-fondue-ticket-service-1 Starting 
+ Container chula-fondue-ticket-service-1 Started 
+$ curl -s -X GET http://localhost:3000/tickets -H 'Authorization: Bearer <Admin token>'
+{"tickets":[{"photoUrls":["http://localhost:3000/uploads/17ef41aa-3c7a-46bd-8920-9a171512e009.png"],"completionPhotoUrls":[],"id":"2c1fc7a4-49c9-45bc-a0f3-f077abef394c","category":"Electrical","location":"ENG4 room 401","description":"Flickering light","reporterEmail":"visitor-1793106902@example.com","status":"ASSIGNED","departmentId":"c71e4b5e-94e0-41a8-85b7-9e923953d599","departmentName":"Electrical Team 1793106902","reason":"","createdAt":"2026-10-27T13:15:04.311Z","updatedAt":"2026-10-27T13:15:04.493Z"},{"photoUrls":["http://localhost:3000/uploads/64af4530-dde6-470a-a9af-1c5d077306f6.png"],"completionPhotoUrls":[],"id":"666efdbc-14c9-41d1-80b3-ea531ccb8e20","category":"Cleaning","location":"ENG2 hall","description":"Spilled paint","reporterEmail":"sec-reporter-2-1793106888@student.chula.ac.th","status":"SUBMITTED","departmentId":"","departmentName":"","reason":"","createdAt":"2026-10-27T13:14:49.307Z","updatedAt":"2026-10-27T13:14:49.307Z"},{"photoUrls":["http://localhost:3000/uploads/897943f9-0f81-4a64-a181-448fa3998dbd.png"],"completionPhotoUrls":[],"id":"a7aaa2ca-83c1-4ac0-9216-f083d011f5f7","category":"Plumbing","location":"ENG1 restroom","description":"Leaking tap","reporterEmail":"sec-reporter-1-1793106888@student.chula.ac.th","status":"ASSIGNED","departmentId":"93ef144c-c01c-49c7-a650-de8336fe1a0a","departmentName":"Sec Dept A 1793106888","reason":"","createdAt":"2026-10-27T13:14:49.250Z","updatedAt":"2026-10-27T13:14:49.610Z"}]}
+-> HTTP 200 (expected 200)
+ticket-service IP before: 172.23.0.8   after: 172.23.0.10   answering again after 612 ms
+(measured from 'docker compose up' returning; includes the new container's own start-up)
+   ok     the container IP really changed
+   ok     back within 30 s (proposed criterion)
+
+=== D6 Nothing was reconfigured or restarted on the gateway side ===
+$ docker compose exec api-gateway printenv TICKET_SERVICE_URL
+TICKET_SERVICE_URL=dns:///ticket-service:50051
+   ok     api-gateway container was not restarted
+$ curl -s -X GET http://localhost:3000/health/ready -H 'Authorization: Bearer <Admin token>'
+{"status":"ready","checks":{"auth-service":"up","department-service":"up","ticket-service":"up"}}
+-> HTTP 200 (expected 200)
+
+ALL CHECKS PASSED
+Saved to demo-progress3/evidence/discovery-20261027-201519.log
