@@ -129,7 +129,7 @@ Stub or not built:
 - No Analytics Service
 - React UI, Cloudinary uploads, PostgreSQL migration, RabbitMQ and a MongoDB-backed Notification Service remain target work; Gmail and seven-day automatic closure remain future work
 
-**Revised submission document:** [Proposal PDF](docs/proposal.pdf), [editable proposal](docs/proposal.md), [11 ADRs](docs/adr/README.md) and [Person 4 handoff](docs/handoffs/person-4.md). The report includes three rendered diagrams and actual NFR results; the complete verification suite still records the stopped-Ticket 504-versus-503 finding.
+**Revised submission document:** [Proposal PDF](docs/proposal.pdf), [editable proposal](docs/proposal.md), [11 ADRs](docs/adr/README.md) and three rendered diagrams. The [Person 5 video package](docs/video/submission-checklist.md) is ready to record; no completed clip exists yet. The report includes actual NFR results; the complete verification suite still records the stopped-Ticket 504-versus-503 finding.
 
 ## Differences from the spec
 
