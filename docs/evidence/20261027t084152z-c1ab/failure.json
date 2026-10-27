@@ -1,0 +1,76 @@
+{
+  "ticketId": "8dc778b5-f16a-4b8d-a94d-0960a2c92cf6",
+  "before": {
+    "history": [
+      {
+        "fromStatus": "",
+        "toStatus": "SUBMITTED",
+        "note": "Ticket created",
+        "changedAt": "2026-10-27T08:42:26.995Z"
+      }
+    ],
+    "ticket": {
+      "id": "8dc778b5-f16a-4b8d-a94d-0960a2c92cf6",
+      "category": "Verification",
+      "location": "P3-TEST-20",
+      "description": "Isolated fixture 20261027t084152z-c1ab, item 20",
+      "photoUrl": "",
+      "reporterEmail": "person3-0@example.com",
+      "status": "SUBMITTED",
+      "departmentId": "",
+      "departmentName": "",
+      "reason": "",
+      "createdAt": "2026-10-27T08:42:26.995Z",
+      "updatedAt": "2026-10-27T08:42:26.995Z"
+    }
+  },
+  "phases": [
+    {
+      "phase": "department-service-stopped",
+      "status": "PASS",
+      "readinessStatus": 503,
+      "readinessMs": 14.718250000005355,
+      "expectedHttpStatus": 503,
+      "httpStatus": 503,
+      "durationMs": 13.560957999987295,
+      "assignmentStatus": 503,
+      "assignmentMs": 84.94020799998543,
+      "ticketAndHistory": "unchanged",
+      "restored": true
+    },
+    {
+      "phase": "department-service-slow",
+      "status": "PASS",
+      "readinessStatus": 503,
+      "readinessMs": 757.8041249999951,
+      "expectedHttpStatus": 504,
+      "httpStatus": 504,
+      "durationMs": 2010.143041000003,
+      "assignmentStatus": 504,
+      "assignmentMs": 2061.191792000027,
+      "ticketAndHistory": "unchanged",
+      "restored": true
+    },
+    {
+      "phase": "ticket-service-stopped",
+      "status": "FAIL",
+      "readinessStatus": 503,
+      "readinessMs": 763.9477919999918,
+      "expectedHttpStatus": 503,
+      "httpStatus": 504,
+      "durationMs": 3027.046333999984,
+      "error": "ticket-service-stopped: expected HTTP 503, observed 504 in 3027.0ms\n\n504 !== 503\n",
+      "restored": true
+    },
+    {
+      "phase": "ticket-service-slow",
+      "status": "PASS",
+      "readinessStatus": 503,
+      "readinessMs": 761.7971249999828,
+      "expectedHttpStatus": 504,
+      "httpStatus": 504,
+      "durationMs": 3017.001042000018,
+      "restored": true
+    }
+  ]
+}

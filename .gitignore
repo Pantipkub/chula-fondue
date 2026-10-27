@@ -1,4 +1,9 @@
 node_modules/
 dist/
 *.sqlite
+*.sqlite-*
 demo/.ids
+.env
+.env.*
+!.env.example
+output/

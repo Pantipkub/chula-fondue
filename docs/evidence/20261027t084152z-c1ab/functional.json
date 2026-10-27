@@ -1,0 +1,19 @@
+{
+  "lifecycleTicketId": "70fce266-7351-4c3c-9663-1e9140481277",
+  "historyStates": [
+    "SUBMITTED",
+    "ASSIGNED",
+    "IN_PROGRESS",
+    "RESOLVED",
+    "IN_PROGRESS",
+    "RESOLVED",
+    "CLOSED"
+  ],
+  "cancelledId": "f2112ba5-8b75-4539-b60f-d2d27adb524b",
+  "rejectedId": "574c9a4a-d281-4efc-a61c-721e33db9e66",
+  "unchangedId": "c146905c-c382-4710-b8ce-ccb3ec99a5e4",
+  "trace": "person3-trace-7ac202c6-32b1-47de-81af-b500918718d4",
+  "filters": 5,
+  "visibleTicketsAfter": 103,
+  "totalTicketsAfter": 104
+}

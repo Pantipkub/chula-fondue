@@ -1,0 +1,77 @@
+name: chula-fondue
+
+x-runtime: &runtime
+  init: true
+  restart: unless-stopped
+  networks:
+    - backend
+
+x-healthcheck: &healthcheck
+  interval: 10s
+  timeout: 5s
+  start_period: 20s
+  retries: 3
+
+services:
+  department-service:
+    <<: *runtime
+    build:
+      context: .
+      args:
+        SERVICE_NAME: department-service
+    environment:
+      DEPARTMENT_PORT: "3001"
+      DEPARTMENT_DB_PATH: /data/department.sqlite
+    volumes:
+      - department-data:/data
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "node", "/app/docker/healthcheck.mjs", "department-service"]
+
+  ticket-service:
+    <<: *runtime
+    build:
+      context: .
+      args:
+        SERVICE_NAME: ticket-service
+    environment:
+      TICKET_GRPC_URL: 0.0.0.0:50051
+      DEPARTMENT_SERVICE_URL: http://department-service:3001
+      TICKET_DB_PATH: /data/ticket.sqlite
+    volumes:
+      - ticket-data:/data
+    depends_on:
+      department-service:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "node", "/app/docker/healthcheck.mjs", "ticket-service"]
+
+  api-gateway:
+    <<: *runtime
+    build:
+      context: .
+      args:
+        SERVICE_NAME: api-gateway
+    environment:
+      GATEWAY_PORT: "3000"
+      DEPARTMENT_SERVICE_URL: http://department-service:3001
+      TICKET_SERVICE_URL: ticket-service:50051
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-3000}:3000"
+    depends_on:
+      department-service:
+        condition: service_healthy
+      ticket-service:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "node", "/app/docker/healthcheck.mjs", "api-gateway"]
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  department-data:
+  ticket-data:

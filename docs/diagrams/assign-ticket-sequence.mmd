@@ -1,0 +1,37 @@
+sequenceDiagram
+    autonumber
+    actor Caller
+    participant Gateway as API Gateway (HTTP)
+    participant Ticket as Ticket Service (gRPC)
+    participant Department as Department Service (REST)
+    participant DB as Ticket SQLite
+    participant Stub as Notification log stub
+
+    Caller->>Gateway: POST /tickets/:id/assign + x-request-id
+    Gateway->>Ticket: AssignTicket + metadata ID + native deadline (3s)
+    Ticket->>DB: Load ticket and validate allowed state
+    Ticket->>Department: GET /departments/:id + same ID<br/>timeout min(2s, remaining deadline - margin)
+    alt Department unreachable
+        Department--xTicket: Connection failure
+        Ticket-->>Gateway: UNAVAILABLE (no writes)
+        Gateway-->>Caller: HTTP 503 + x-request-id
+    else Department lookup exceeds budget
+        Ticket->>Ticket: Abort fetch and stop lookup
+        Ticket-->>Gateway: DEADLINE_EXCEEDED (no writes)
+        Gateway-->>Caller: HTTP 504 + x-request-id
+    else Department missing
+        Department-->>Ticket: HTTP 404
+        Ticket-->>Gateway: NOT_FOUND (no writes)
+        Gateway-->>Caller: HTTP 404 + x-request-id
+    else Department valid
+        Department-->>Ticket: HTTP 200 + department
+        Ticket->>Ticket: Check cancellation/deadline before saving
+        Ticket->>DB: Transaction: ticket ASSIGNED + history
+        DB-->>Ticket: Commit
+        Ticket->>Stub: Log notification
+        Ticket-->>Gateway: ASSIGNED ticket
+        Gateway-->>Caller: HTTP 200 + x-request-id
+    end
+
+    Note over Caller,DB: A deadline after commit can leave an uncertain result.<br/>Read ticket/history before another mutation.<br/>Automatic mutation retries are disabled.
+    Note over Ticket,Stub: RabbitMQ/Notification Service is target work.<br/>This implemented flow still uses the log stub.

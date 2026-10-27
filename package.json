@@ -6,6 +6,7 @@
   ],
   "scripts": {
     "install:all": "npm install",
+    "build": "npm run build --workspaces",
     "dev": "concurrently -n department,ticket,gateway -c blue,green,magenta \"npm start -w department-service\" \"npm start -w ticket-service\" \"npm start -w api-gateway\""
   },
   "devDependencies": {

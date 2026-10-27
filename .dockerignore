@@ -1,0 +1,15 @@
+.git
+.agents
+.codex
+**/node_modules
+**/dist
+**/*.sqlite
+**/*.sqlite-*
+.env
+.env.*
+!.env.example
+docs
+output
+demo/.ids
+**/.DS_Store
+**/npm-debug.log*

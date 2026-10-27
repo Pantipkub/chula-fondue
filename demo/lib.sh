@@ -1,6 +1,13 @@
 # Shared by the curl demo scripts: print each command, then its response and HTTP status.
 FAILED=0
 
+# Read .env with Node's parser rather than executing it as a shell script.
+CHULA_ENV_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.env"
+env_value() {
+  node --env-file-if-exists="$CHULA_ENV_FILE" -e \
+    'process.stdout.write(process.env[process.argv[1]] ?? process.argv[2])' "$1" "$2"
+}
+
 step() { printf '\n=== %s ===\n' "$*"; }
 
 # call EXPECTED_STATUS METHOD URL [JSON_BODY]; leaves the response body in $BODY

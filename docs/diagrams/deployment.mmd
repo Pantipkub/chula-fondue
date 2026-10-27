@@ -1,0 +1,21 @@
+flowchart LR
+    HOST["Host browser / API tools<br/>http://localhost:3000<br/>host port configurable"]
+
+    subgraph COMPOSE["Compose project"]
+        subgraph NETWORK["backend DNS"]
+            GATEWAY["api-gateway<br/>REST :3000<br/>/health and /ready"]
+            TICKET["ticket-service<br/>gRPC :50051<br/>listener 0.0.0.0:50051<br/>CheckHealth"]
+            DEPARTMENT["department-service<br/>REST :3001<br/>/health and /ready"]
+
+            GATEWAY -->|"gRPC<br/>ticket-service:50051"| TICKET
+            GATEWAY -->|"REST<br/>department-service:3001"| DEPARTMENT
+            TICKET -->|"REST assignment lookup<br/>department-service:3001"| DEPARTMENT
+        end
+
+        TICKET_VOLUME[("ticket-data named volume<br/>/data/ticket.sqlite<br/>owned by Ticket Service")]
+        DEPARTMENT_VOLUME[("department-data named volume<br/>/data/department.sqlite<br/>owned by Department Service")]
+        TICKET -->|"TICKET_DB_PATH"| TICKET_VOLUME
+        DEPARTMENT -->|"DEPARTMENT_DB_PATH"| DEPARTMENT_VOLUME
+    end
+
+    HOST -->|"127.0.0.1 only<br/>host :3000 to container :3000"| GATEWAY

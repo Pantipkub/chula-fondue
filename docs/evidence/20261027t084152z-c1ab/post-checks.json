@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-10-27T08:49:08.819Z",
+  "javascriptSyntax": "PASS (all four verification modules)",
+  "rawCsvAudit": "PASS",
+  "gitDiffCheck": "PASS",
+  "sourceFingerprints": {
+    "status": "MATCH",
+    "files": 43
+  },
+  "localDocumentLinks": "PASS",
+  "retainedProject": {
+    "containers": 0,
+    "namedVolumes": 2
+  },
+  "overallSuite": "FAIL: Ticket stopped returned HTTP 504 instead of expected 503"
+}

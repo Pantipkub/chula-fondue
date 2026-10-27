@@ -1,0 +1,352 @@
+{
+  "runId": "20261027t083522z-e1d3",
+  "startedAt": "2026-10-27T08:35:22.855Z",
+  "finishedAt": "2026-10-27T08:38:53.975Z",
+  "command": "node scripts/verification/run.mjs",
+  "project": "chula-fondue-person3-20261027t083522z-e1d3",
+  "baseUrl": "http://127.0.0.1:31320",
+  "options": {
+    "mode": "all",
+    "port": 31320,
+    "project": "chula-fondue-person3-20261027t083522z-e1d3",
+    "warmup": 10,
+    "duration": 60,
+    "concurrency": 20,
+    "keepUp": false
+  },
+  "requiredLoadProfile": true,
+  "interrupted": false,
+  "status": "FAIL",
+  "checks": [
+    {
+      "name": "setup",
+      "status": "PASS",
+      "detail": {
+        "project": "chula-fondue-person3-20261027t083522z-e1d3",
+        "port": 31320,
+        "environment": "environment.json"
+      },
+      "durationMs": 35132.063958,
+      "finishedAt": "2026-10-27T08:35:57.968Z"
+    },
+    {
+      "name": "fixtures",
+      "status": "PASS",
+      "detail": {
+        "count": 100,
+        "assigned": 20,
+        "submitted": 80
+      },
+      "durationMs": 1261.4302499999976,
+      "finishedAt": "2026-10-27T08:35:59.228Z"
+    },
+    {
+      "name": "performance",
+      "status": "PASS",
+      "detail": [
+        {
+          "name": "tickets-list",
+          "startedAt": "2026-10-27T08:36:09.271Z",
+          "finishedAt": "2026-10-27T08:37:09.306Z",
+          "model": "closed-loop; one in-flight request per worker; no think time",
+          "concurrency": 20,
+          "warmupSeconds": 10,
+          "scheduledSeconds": 60,
+          "elapsedIncludingDrainSeconds": 60.008449999999996,
+          "requests": 71601,
+          "errors": 0,
+          "errorRatePercent": 0,
+          "throughputPerSecond": 1193.1819602072708,
+          "p50Ms": 13.007291000001715,
+          "p95Ms": 23.620875000000524,
+          "p99Ms": 43.861000000004424,
+          "maxMs": 1194.2855419999978,
+          "statusCounts": {
+            "200": 71601
+          },
+          "errorCounts": {},
+          "responseBytes": 2691696393,
+          "target": {
+            "p95MsLessThan": 1000,
+            "errorRatePercentLessThan": 1
+          },
+          "raw": "tickets-list-samples.csv",
+          "status": "PASS"
+        },
+        {
+          "name": "ticket-history",
+          "startedAt": "2026-10-27T08:37:19.367Z",
+          "finishedAt": "2026-10-27T08:38:19.424Z",
+          "model": "closed-loop; one in-flight request per worker; no think time",
+          "concurrency": 20,
+          "warmupSeconds": 10,
+          "scheduledSeconds": 60,
+          "elapsedIncludingDrainSeconds": 60.00640299999999,
+          "requests": 88492,
+          "errors": 0,
+          "errorRatePercent": 0,
+          "throughputPerSecond": 1474.709290606871,
+          "p50Ms": 6.449708000000101,
+          "p95Ms": 16.525000000023283,
+          "p99Ms": 42.138000000006286,
+          "maxMs": 3469.471499999985,
+          "statusCounts": {
+            "200": 88492
+          },
+          "errorCounts": {},
+          "responseBytes": 46883388,
+          "target": {
+            "p95MsLessThan": 1000,
+            "errorRatePercentLessThan": 1
+          },
+          "raw": "ticket-history-samples.csv",
+          "status": "PASS"
+        }
+      ],
+      "durationMs": 140309.523083,
+      "finishedAt": "2026-10-27T08:38:19.517Z"
+    },
+    {
+      "name": "functional",
+      "status": "PASS",
+      "detail": {
+        "lifecycleTicketId": "980011b9-3169-4667-9534-d39006a856e6",
+        "historyStates": [
+          "SUBMITTED",
+          "ASSIGNED",
+          "IN_PROGRESS",
+          "RESOLVED",
+          "IN_PROGRESS",
+          "RESOLVED",
+          "CLOSED"
+        ],
+        "cancelledId": "091c3f93-ce0f-4efc-b0e4-44fa4ae0918d",
+        "rejectedId": "2efbcb53-0915-4059-b459-65f7e9fdb0c2",
+        "unchangedId": "72e62995-d049-485b-95dc-560cc8492f39",
+        "trace": "person3-trace-0c88c6b3-e6bc-491d-84d8-5bc651d233f2",
+        "filters": 5,
+        "visibleTicketsAfter": 103,
+        "totalTicketsAfter": 104
+      },
+      "durationMs": 136.67725000000792,
+      "finishedAt": "2026-10-27T08:38:19.666Z"
+    },
+    {
+      "name": "discovery-and-persistence",
+      "status": "PASS",
+      "detail": {
+        "before": {
+          "department": {
+            "id": "6182c4c7-df5e-4a7a-a2b0-fbc639e29170",
+            "name": "Person 3 20261027t083522z-e1d3",
+            "contactEmail": "person3-department@example.com",
+            "buildings": [
+              "P3-TEST"
+            ],
+            "createdAt": "2026-10-27T08:35:58.000Z",
+            "updatedAt": "2026-10-27T08:35:58.000Z"
+          },
+          "history": {
+            "history": [
+              {
+                "fromStatus": "",
+                "toStatus": "SUBMITTED",
+                "note": "Ticket created",
+                "changedAt": "2026-10-27T08:35:58.066Z"
+              },
+              {
+                "fromStatus": "SUBMITTED",
+                "toStatus": "ASSIGNED",
+                "note": "Assigned to Person 3 20261027t083522z-e1d3",
+                "changedAt": "2026-10-27T08:35:58.101Z"
+              }
+            ],
+            "ticket": {
+              "id": "55affa34-e577-44a1-a9e2-d26c68c0e883",
+              "category": "Verification",
+              "location": "P3-TEST-0",
+              "description": "Isolated fixture 20261027t083522z-e1d3, item 0",
+              "photoUrl": "",
+              "reporterEmail": "person3-0@example.com",
+              "status": "ASSIGNED",
+              "departmentId": "6182c4c7-df5e-4a7a-a2b0-fbc639e29170",
+              "departmentName": "Person 3 20261027t083522z-e1d3",
+              "reason": "",
+              "createdAt": "2026-10-27T08:35:58.066Z",
+              "updatedAt": "2026-10-27T08:35:58.101Z"
+            }
+          }
+        },
+        "dnsBefore": {
+          "endpoints": {
+            "department": "http://department-service:3001",
+            "ticket": "ticket-service:50051"
+          },
+          "dns": {
+            "department-service": [
+              {
+                "address": "192.168.0.2",
+                "family": 4
+              }
+            ],
+            "ticket-service": [
+              {
+                "address": "192.168.0.3",
+                "family": 4
+              }
+            ]
+          }
+        },
+        "gatewayBefore": "9213dd08f6a6171cf666b77fceb4724b3f2f949dbbfb4772b67b906bb56572a4",
+        "recreations": [
+          {
+            "service": "department-service",
+            "idBefore": "1c80d63e665b3f7e2528592286957d4047ca30af22541de53f2617b18bed8c9a",
+            "idAfter": "79d20813e70d2070fd174d5058d73bd09731f430633e0da08f5565326da764fc",
+            "dnsAfter": {
+              "endpoints": {
+                "department": "http://department-service:3001",
+                "ticket": "ticket-service:50051"
+              },
+              "dns": {
+                "department-service": [
+                  {
+                    "address": "192.168.0.2",
+                    "family": 4
+                  }
+                ],
+                "ticket-service": [
+                  {
+                    "address": "192.168.0.3",
+                    "family": 4
+                  }
+                ]
+              }
+            },
+            "recordsAndHistory": "unchanged"
+          },
+          {
+            "service": "ticket-service",
+            "idBefore": "521e2f1606f2cc71ddfdf6e190a2a7fa5914f916c6cd856fe5b3f0f10778509e",
+            "idAfter": "5833639adf0114fb6e27beb0124f85302a73d74467d5107624029ede350d30cd",
+            "dnsAfter": {
+              "endpoints": {
+                "department": "http://department-service:3001",
+                "ticket": "ticket-service:50051"
+              },
+              "dns": {
+                "department-service": [
+                  {
+                    "address": "192.168.0.2",
+                    "family": 4
+                  }
+                ],
+                "ticket-service": [
+                  {
+                    "address": "192.168.0.3",
+                    "family": 4
+                  }
+                ]
+              }
+            },
+            "recordsAndHistory": "unchanged"
+          }
+        ]
+      },
+      "durationMs": 14240.778292000003,
+      "finishedAt": "2026-10-27T08:38:33.906Z"
+    },
+    {
+      "name": "dependency-failures",
+      "status": "FAIL",
+      "error": "GET /tickets: {\"statusCode\":504,\"message\":\"Ticket Service timed out\"}\n\n504 !== 503\n",
+      "durationMs": 15077.621291999996,
+      "finishedAt": "2026-10-27T08:38:48.984Z"
+    },
+    {
+      "name": "request-correlation",
+      "status": "FAIL",
+      "error": "trace reaches api-gateway",
+      "durationMs": 112.86974999998347,
+      "finishedAt": "2026-10-27T08:38:49.098Z"
+    },
+    {
+      "name": "restoration",
+      "status": "FAIL",
+      "error": "docker compose -p chula-fondue-person3-20261027t083522z-e1d3 start failed (exit 1):  Container chula-fondue-person3-20261027t083522z-e1d3-department-service-1  Waiting\n Container chula-fondue-person3-20261027t083522z-e1d3-ticket-service-1  Waiting\n Container chula-fondue-person3-20261027t083522z-e1d3-department-service-1  Error\n Container chula-fondue-person3-20261027t083522z-e1d3-ticket-service-1  Healthy\ndependency failed to start: container chula-fondue-person3-20261027t083522z-e1d3-department-service-1 is unhealthy\n",
+      "durationMs": 4199.181249999994
+    },
+    {
+      "name": "shutdown",
+      "status": "PASS",
+      "detail": "containers/network removed; named volumes retained"
+    }
+  ],
+  "performance": [
+    {
+      "name": "tickets-list",
+      "startedAt": "2026-10-27T08:36:09.271Z",
+      "finishedAt": "2026-10-27T08:37:09.306Z",
+      "model": "closed-loop; one in-flight request per worker; no think time",
+      "concurrency": 20,
+      "warmupSeconds": 10,
+      "scheduledSeconds": 60,
+      "elapsedIncludingDrainSeconds": 60.008449999999996,
+      "requests": 71601,
+      "errors": 0,
+      "errorRatePercent": 0,
+      "throughputPerSecond": 1193.1819602072708,
+      "p50Ms": 13.007291000001715,
+      "p95Ms": 23.620875000000524,
+      "p99Ms": 43.861000000004424,
+      "maxMs": 1194.2855419999978,
+      "statusCounts": {
+        "200": 71601
+      },
+      "errorCounts": {},
+      "responseBytes": 2691696393,
+      "target": {
+        "p95MsLessThan": 1000,
+        "errorRatePercentLessThan": 1
+      },
+      "raw": "tickets-list-samples.csv",
+      "status": "PASS"
+    },
+    {
+      "name": "ticket-history",
+      "startedAt": "2026-10-27T08:37:19.367Z",
+      "finishedAt": "2026-10-27T08:38:19.424Z",
+      "model": "closed-loop; one in-flight request per worker; no think time",
+      "concurrency": 20,
+      "warmupSeconds": 10,
+      "scheduledSeconds": 60,
+      "elapsedIncludingDrainSeconds": 60.00640299999999,
+      "requests": 88492,
+      "errors": 0,
+      "errorRatePercent": 0,
+      "throughputPerSecond": 1474.709290606871,
+      "p50Ms": 6.449708000000101,
+      "p95Ms": 16.525000000023283,
+      "p99Ms": 42.138000000006286,
+      "maxMs": 3469.471499999985,
+      "statusCounts": {
+        "200": 88492
+      },
+      "errorCounts": {},
+      "responseBytes": 46883388,
+      "target": {
+        "p95MsLessThan": 1000,
+        "errorRatePercentLessThan": 1
+      },
+      "raw": "ticket-history-samples.csv",
+      "status": "PASS"
+    }
+  ],
+  "evidenceDirectory": "docs/evidence/20261027t083522z-e1d3",
+  "limitations": [
+    "Single local Docker host, SQLite, no authentication or external integrations.",
+    "20 closed-loop workers are not 1,000 active users.",
+    "No sustained uptime, HA, multi-host discovery, backup/restore or write-load claim.",
+    "Other Compose projects remain running; CPU, memory and load-generator resources are shared."
+  ]
+}

@@ -2,7 +2,7 @@
 # REST CRUD demo on department-service (checks R1-R8). Run against fresh databases.
 cd "$(dirname "$0")" || exit 1
 source ./lib.sh
-BASE=${DEPARTMENT_SERVICE_URL:-http://localhost:3001}
+BASE=$(env_value DEPARTMENT_SERVICE_URL http://localhost:3001) || exit 1
 
 step "R1 Create department A"
 call 201 POST "$BASE/departments" '{"name":"Engineering Facilities","contactEmail":"eng-facilities@chula.ac.th","buildings":["ENG1","ENG3"]}'

@@ -1,0 +1,51 @@
+{
+  "ticketId": "98a72bd5-9551-4d96-a683-1f2884811702",
+  "before": {
+    "history": [
+      {
+        "fromStatus": "",
+        "toStatus": "SUBMITTED",
+        "note": "Ticket created",
+        "changedAt": "2026-10-27T08:35:58.405Z"
+      }
+    ],
+    "ticket": {
+      "id": "98a72bd5-9551-4d96-a683-1f2884811702",
+      "category": "Verification",
+      "location": "P3-TEST-20",
+      "description": "Isolated fixture 20261027t083522z-e1d3, item 20",
+      "photoUrl": "",
+      "reporterEmail": "person3-0@example.com",
+      "status": "SUBMITTED",
+      "departmentId": "",
+      "departmentName": "",
+      "reason": "",
+      "createdAt": "2026-10-27T08:35:58.405Z",
+      "updatedAt": "2026-10-27T08:35:58.405Z"
+    }
+  },
+  "phases": [
+    {
+      "phase": "department-service-stopped",
+      "readinessStatus": 503,
+      "readinessMs": 26.800542000011774,
+      "httpStatus": 503,
+      "durationMs": 8.339458000002196,
+      "assignmentStatus": 503,
+      "assignmentMs": 40.83050000001094,
+      "ticketAndHistory": "unchanged",
+      "restored": true
+    },
+    {
+      "phase": "department-service-slow",
+      "readinessStatus": 503,
+      "readinessMs": 860.1253750000033,
+      "httpStatus": 504,
+      "durationMs": 2541.0285840000142,
+      "assignmentStatus": 504,
+      "assignmentMs": 2487.4947499999835,
+      "ticketAndHistory": "unchanged",
+      "restored": true
+    }
+  ]
+}

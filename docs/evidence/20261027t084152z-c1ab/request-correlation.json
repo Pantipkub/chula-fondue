@@ -1,0 +1,52 @@
+{
+  "requestId": "person3-trace-7ac202c6-32b1-47de-81af-b500918718d4",
+  "services": [
+    "department-service",
+    "ticket-service",
+    "api-gateway"
+  ],
+  "records": [
+    {
+      "event": "http_request",
+      "service": "department-service",
+      "requestId": "person3-trace-7ac202c6-32b1-47de-81af-b500918718d4",
+      "operation": "GET /departments/6d321167-f0b0-4887-925e-f56c2cdc6221",
+      "status": 200,
+      "durationMs": 1
+    },
+    {
+      "event": "dependency_call",
+      "service": "ticket-service",
+      "dependency": "department-service",
+      "requestId": "person3-trace-7ac202c6-32b1-47de-81af-b500918718d4",
+      "operation": "GetDepartment",
+      "grpcCode": 0,
+      "durationMs": 6
+    },
+    {
+      "event": "rpc_request",
+      "service": "ticket-service",
+      "requestId": "person3-trace-7ac202c6-32b1-47de-81af-b500918718d4",
+      "operation": "assignTicket",
+      "grpcCode": 0,
+      "durationMs": 15
+    },
+    {
+      "event": "dependency_call",
+      "service": "api-gateway",
+      "dependency": "ticket-service",
+      "requestId": "person3-trace-7ac202c6-32b1-47de-81af-b500918718d4",
+      "operation": "assignTicket",
+      "grpcCode": 0,
+      "durationMs": 17
+    },
+    {
+      "event": "http_request",
+      "service": "api-gateway",
+      "requestId": "person3-trace-7ac202c6-32b1-47de-81af-b500918718d4",
+      "operation": "POST /tickets/70fce266-7351-4c3c-9663-1e9140481277/assign",
+      "status": 200,
+      "durationMs": 18
+    }
+  ]
+}

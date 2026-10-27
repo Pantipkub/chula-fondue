@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NotificationStub } from './notification.stub.js';
 import { Ticket, TicketHistory } from './ticket.entity.js';
+import { assertRpcActive, currentRpc } from './observability.js';
 
 const DEPARTMENT_SERVICE_URL = process.env.DEPARTMENT_SERVICE_URL ?? 'http://localhost:3001';
 
@@ -28,6 +29,21 @@ export class TicketsService {
     @InjectRepository(TicketHistory) private readonly history: Repository<TicketHistory>,
     private readonly notifications: NotificationStub,
   ) {}
+
+  async checkHealth() {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        this.tickets.query('SELECT 1'),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Health query timed out')), 750); }),
+      ]);
+      return { status: 'SERVING', service: 'ticket-service', databaseStatus: 'up' };
+    } catch {
+      return { status: 'NOT_SERVING', service: 'ticket-service', databaseStatus: 'down' };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   create(req: Pick<Ticket, 'category' | 'location' | 'description' | 'photoUrl' | 'reporterEmail'>) {
     requireFields(req, 'category', 'location', 'description', 'reporterEmail');
@@ -63,6 +79,7 @@ export class TicketsService {
     const ticket = await this.load(req.id, 'SUBMITTED', 'ASSIGNED');
     requireFields(req, 'departmentId');
     const department = await this.fetchDepartment(req.departmentId);
+    assertRpcActive();
     ticket.departmentId = department.id;
     ticket.departmentName = department.name;
     return this.setStatus(ticket, 'ASSIGNED', `Assigned to ${department.name}`, department.contactEmail);
@@ -118,12 +135,14 @@ export class TicketsService {
 
   // Every status change goes through here: save the ticket, write one history row, then notify.
   private async setStatus(ticket: Ticket, toStatus: string, note: string, notifyEmail?: string) {
+    assertRpcActive();
     const now = new Date().toISOString();
     const fromStatus = ticket.status ?? '';
     ticket.status = toStatus;
     ticket.createdAt ??= now;
     ticket.updatedAt = now;
     const saved = await this.tickets.manager.transaction(async (manager) => {
+      assertRpcActive();
       const saved = await manager.save(ticket);
       await manager.save(TicketHistory, { ticketId: saved.id, fromStatus, toStatus, note, changedAt: now });
       return saved;
@@ -139,17 +158,53 @@ export class TicketsService {
   }
 
   private async fetchDepartment(departmentId: string): Promise<{ id: string; name: string; contactEmail: string }> {
+    assertRpcActive();
     const url = `${DEPARTMENT_SERVICE_URL}/departments/${encodeURIComponent(departmentId)}`;
-    let response: Response;
+    const rpc = currentRpc();
+    const callDeadline = rpc?.call.getDeadline() ?? Infinity;
+    const end = callDeadline instanceof Date ? callDeadline.getTime() : callDeadline;
+    const timeout = AbortSignal.timeout(Math.min(2000, Math.max(1, Math.floor(end - Date.now() - 25))));
+    const cancellation = new AbortController();
+    const onCancelled = () => cancellation.abort();
+    rpc?.call.once('cancelled', onCancelled);
+    if (rpc?.call.cancelled) cancellation.abort();
+    const signal = AbortSignal.any([timeout, cancellation.signal]);
+    const started = performance.now();
+    let code: number = GrpcStatus.OK;
     try {
-      response = await fetch(url);
-    } catch {
-      this.logger.error(`GET ${url} -> unreachable`);
-      throw rpcError(GrpcStatus.UNAVAILABLE, 'Department Service unreachable');
+      const response = await fetch(url, {
+        signal,
+        headers: rpc ? { 'x-request-id': rpc.requestId } : undefined,
+      });
+      if (response.status === 404) throw rpcError(GrpcStatus.NOT_FOUND, `Department ${departmentId} not found`);
+      if (!response.ok) throw rpcError(GrpcStatus.UNAVAILABLE, 'Department Service returned an error');
+      const department = await response.json() as { id: string; name: string; contactEmail: string };
+      if (department?.id !== departmentId || typeof department.name !== 'string' || typeof department.contactEmail !== 'string') {
+        throw rpcError(GrpcStatus.UNAVAILABLE, 'Department Service returned an invalid response');
+      }
+      return department;
+    } catch (error) {
+      if (error instanceof RpcException) {
+        code = (error.getError() as { code: number }).code;
+        throw error;
+      }
+      if (timeout.aborted) {
+        code = GrpcStatus.DEADLINE_EXCEEDED;
+        throw rpcError(code, 'Department Service timed out');
+      }
+      if (cancellation.signal.aborted) {
+        code = GrpcStatus.CANCELLED;
+        throw rpcError(code, 'Request cancelled');
+      }
+      code = GrpcStatus.UNAVAILABLE;
+      throw rpcError(code, 'Department Service unreachable');
+    } finally {
+      rpc?.call.removeListener('cancelled', onCancelled);
+      this.logger.log(JSON.stringify({
+        event: 'dependency_call', service: 'ticket-service', dependency: 'department-service',
+        requestId: rpc?.requestId, operation: 'GetDepartment', grpcCode: code,
+        durationMs: Math.round(performance.now() - started),
+      }));
     }
-    this.logger.log(`GET ${url} -> ${response.status}`);
-    if (response.status === 404) throw rpcError(GrpcStatus.NOT_FOUND, `Department ${departmentId} not found`);
-    if (!response.ok) throw rpcError(GrpcStatus.UNAVAILABLE, `Department Service returned ${response.status}`);
-    return (await response.json()) as { id: string; name: string; contactEmail: string };
   }
 }

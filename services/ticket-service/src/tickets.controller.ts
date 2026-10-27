@@ -6,6 +6,11 @@ import { TicketsService } from './tickets.service.js';
 export class TicketsController {
   constructor(private readonly tickets: TicketsService) {}
 
+  @GrpcMethod('TicketService', 'CheckHealth')
+  checkHealth() {
+    return this.tickets.checkHealth();
+  }
+
   @GrpcMethod('TicketService', 'CreateTicket')
   createTicket(req: Parameters<TicketsService['create']>[0]) {
     return this.tickets.create(req);

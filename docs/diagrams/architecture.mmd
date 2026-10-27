@@ -1,0 +1,46 @@
+flowchart LR
+    TOOLS["API test tools<br/>Implemented"]
+    UI["React portal<br/>Proposed"]
+    G["API Gateway<br/>REST :3000<br/>Implemented"]
+    T["Ticket Service<br/>gRPC :50051<br/>Implemented"]
+    D["Department Service<br/>REST :3001<br/>Implemented"]
+    TD[("Ticket SQLite<br/>ticket + history<br/>Implemented")]
+    DD[("Department SQLite<br/>directory<br/>Implemented")]
+    S["Notification log stub<br/>inside Ticket<br/>Implemented"]
+    A["Auth Service<br/>own PostgreSQL<br/>Proposed"]
+    C["Cloudinary upload<br/>Proposed"]
+    Q["RabbitMQ<br/>Proposed"]
+    N["Notification Service<br/>Proposed"]
+    M[("Notification MongoDB<br/>Proposed")]
+    E["Gmail delivery<br/>Future"]
+    X["Analytics<br/>Future"]
+
+    TOOLS -->|"local HTTP"| G
+    UI -.->|"REST / HTTPS target"| G
+    G -->|"gRPC"| T
+    G -->|"REST"| D
+    T -->|"REST lookup on assign"| D
+    T --> TD
+    D --> DD
+    T --> S
+    G -.->|"REST"| A
+    G -.->|"HTTPS"| C
+    T -.->|"AMQP publish"| Q
+    Q -.->|"AMQP consume"| N
+    N -.->|"MongoDB driver"| M
+    N -.->|"HTTPS later"| E
+    G -.->|"contract later"| X
+
+    subgraph LEGEND["Legend"]
+        LI["Implemented"]
+        LP["Proposed"]
+        LF["Future"]
+        LI ~~~ LP ~~~ LF
+    end
+
+    classDef implemented fill:#e8f2ff,stroke:#2463a0,stroke-width:2px,color:#10243a
+    classDef proposed fill:#fff6db,stroke:#b77b16,stroke-width:2px,stroke-dasharray:7 4,color:#513a12
+    classDef future fill:#f1f5f9,stroke:#64748b,stroke-width:2px,stroke-dasharray:2 5,color:#334155
+    class TOOLS,G,T,D,TD,DD,S,LI implemented
+    class UI,A,C,Q,N,M,LP proposed
+    class E,X,LF future

@@ -3,7 +3,8 @@
 cd "$(dirname "$0")" || exit 1
 source ./lib.sh
 source ./.ids || { echo "Run demo/rest-demo.sh first, it creates the departments."; exit 1; }
-BASE=${GATEWAY_URL:-http://localhost:3000}
+BASE=$(env_value GATEWAY_URL http://localhost:3000) || exit 1
+DEPARTMENT_BASE=$(env_value DEPARTMENT_SERVICE_URL http://localhost:3001) || exit 1
 
 step "W1 Create a ticket through the gateway"
 call 201 POST "$BASE/tickets" '{"category":"Plumbing","location":"ENG1 2nd floor restroom","description":"Leaking tap","reporterEmail":"student3@student.chula.ac.th"}'
@@ -15,7 +16,7 @@ call 200 POST "$BASE/tickets/$TICKET/assign" "{\"departmentId\":\"$DEPT_A\"}"
 step "W3 List departments through the gateway, then directly on department-service"
 call 200 GET "$BASE/departments"
 VIA_GATEWAY=$BODY
-call 200 GET "${DEPARTMENT_SERVICE_URL:-http://localhost:3001}/departments"
+call 200 GET "$DEPARTMENT_BASE/departments"
 if [ "$VIA_GATEWAY" = "$BODY" ]; then
   echo "-> identical responses"
 else

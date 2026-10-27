@@ -1,39 +1,19 @@
-import { status as GrpcStatus } from '@grpc/grpc-js';
 import {
   Body,
   Controller,
   Delete,
   Get,
   HttpCode,
-  HttpException,
-  Inject,
-  OnModuleInit,
   Param,
   Post,
   Query,
 } from '@nestjs/common';
-import type { ClientGrpc } from '@nestjs/microservices';
-import { firstValueFrom, Observable } from 'rxjs';
-
-type TicketRpc = (request: object) => Observable<unknown>;
-
-const HTTP_STATUS_BY_GRPC_CODE: Record<number, number> = {
-  [GrpcStatus.NOT_FOUND]: 404,
-  [GrpcStatus.INVALID_ARGUMENT]: 400,
-  [GrpcStatus.FAILED_PRECONDITION]: 409,
-  [GrpcStatus.UNAVAILABLE]: 503,
-};
+import { TicketClient } from './ticket.client.js';
 
 // No business logic here: every route forwards to one TicketService RPC.
 @Controller('tickets')
-export class TicketsController implements OnModuleInit {
-  private ticketService: Record<string, TicketRpc>;
-
-  constructor(@Inject('TICKET_PACKAGE') private readonly client: ClientGrpc) {}
-
-  onModuleInit() {
-    this.ticketService = this.client.getService('TicketService');
-  }
+export class TicketsController {
+  constructor(private readonly tickets: TicketClient) {}
 
   @Post()
   create(@Body() body: object) {
@@ -97,11 +77,6 @@ export class TicketsController implements OnModuleInit {
   }
 
   private async forward(rpc: string, request: object) {
-    try {
-      return await firstValueFrom(this.ticketService[rpc](request));
-    } catch (error) {
-      const { code, details, message } = error as { code?: number; details?: string; message?: string };
-      throw new HttpException(details || message || 'Ticket Service error', HTTP_STATUS_BY_GRPC_CODE[code ?? -1] ?? 500);
-    }
+    return this.tickets.call(rpc, request);
   }
 }

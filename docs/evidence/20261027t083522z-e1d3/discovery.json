@@ -1,0 +1,119 @@
+{
+  "before": {
+    "department": {
+      "id": "6182c4c7-df5e-4a7a-a2b0-fbc639e29170",
+      "name": "Person 3 20261027t083522z-e1d3",
+      "contactEmail": "person3-department@example.com",
+      "buildings": [
+        "P3-TEST"
+      ],
+      "createdAt": "2026-10-27T08:35:58.000Z",
+      "updatedAt": "2026-10-27T08:35:58.000Z"
+    },
+    "history": {
+      "history": [
+        {
+          "fromStatus": "",
+          "toStatus": "SUBMITTED",
+          "note": "Ticket created",
+          "changedAt": "2026-10-27T08:35:58.066Z"
+        },
+        {
+          "fromStatus": "SUBMITTED",
+          "toStatus": "ASSIGNED",
+          "note": "Assigned to Person 3 20261027t083522z-e1d3",
+          "changedAt": "2026-10-27T08:35:58.101Z"
+        }
+      ],
+      "ticket": {
+        "id": "55affa34-e577-44a1-a9e2-d26c68c0e883",
+        "category": "Verification",
+        "location": "P3-TEST-0",
+        "description": "Isolated fixture 20261027t083522z-e1d3, item 0",
+        "photoUrl": "",
+        "reporterEmail": "person3-0@example.com",
+        "status": "ASSIGNED",
+        "departmentId": "6182c4c7-df5e-4a7a-a2b0-fbc639e29170",
+        "departmentName": "Person 3 20261027t083522z-e1d3",
+        "reason": "",
+        "createdAt": "2026-10-27T08:35:58.066Z",
+        "updatedAt": "2026-10-27T08:35:58.101Z"
+      }
+    }
+  },
+  "dnsBefore": {
+    "endpoints": {
+      "department": "http://department-service:3001",
+      "ticket": "ticket-service:50051"
+    },
+    "dns": {
+      "department-service": [
+        {
+          "address": "192.168.0.2",
+          "family": 4
+        }
+      ],
+      "ticket-service": [
+        {
+          "address": "192.168.0.3",
+          "family": 4
+        }
+      ]
+    }
+  },
+  "gatewayBefore": "9213dd08f6a6171cf666b77fceb4724b3f2f949dbbfb4772b67b906bb56572a4",
+  "recreations": [
+    {
+      "service": "department-service",
+      "idBefore": "1c80d63e665b3f7e2528592286957d4047ca30af22541de53f2617b18bed8c9a",
+      "idAfter": "79d20813e70d2070fd174d5058d73bd09731f430633e0da08f5565326da764fc",
+      "dnsAfter": {
+        "endpoints": {
+          "department": "http://department-service:3001",
+          "ticket": "ticket-service:50051"
+        },
+        "dns": {
+          "department-service": [
+            {
+              "address": "192.168.0.2",
+              "family": 4
+            }
+          ],
+          "ticket-service": [
+            {
+              "address": "192.168.0.3",
+              "family": 4
+            }
+          ]
+        }
+      },
+      "recordsAndHistory": "unchanged"
+    },
+    {
+      "service": "ticket-service",
+      "idBefore": "521e2f1606f2cc71ddfdf6e190a2a7fa5914f916c6cd856fe5b3f0f10778509e",
+      "idAfter": "5833639adf0114fb6e27beb0124f85302a73d74467d5107624029ede350d30cd",
+      "dnsAfter": {
+        "endpoints": {
+          "department": "http://department-service:3001",
+          "ticket": "ticket-service:50051"
+        },
+        "dns": {
+          "department-service": [
+            {
+              "address": "192.168.0.2",
+              "family": 4
+            }
+          ],
+          "ticket-service": [
+            {
+              "address": "192.168.0.3",
+              "family": 4
+            }
+          ]
+        }
+      },
+      "recordsAndHistory": "unchanged"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "status": "PASS",
+  "auditedAt": "2026-10-27T08:41:50.580Z",
+  "method": "Recomputed from raw CSV; percentile tolerance 0.001ms for CSV rounding",
+  "endpoints": [
+    {
+      "name": "tickets-list",
+      "requests": 71601,
+      "errors": 0,
+      "workers": 20,
+      "uniquePaths": 1,
+      "p50Ms": 13.007,
+      "p95Ms": 23.621,
+      "p99Ms": 43.861,
+      "throughputPerSecond": 1193.1819602072708
+    },
+    {
+      "name": "ticket-history",
+      "requests": 88492,
+      "errors": 0,
+      "workers": 20,
+      "uniquePaths": 100,
+      "p50Ms": 6.45,
+      "p95Ms": 16.525,
+      "p99Ms": 42.138,
+      "throughputPerSecond": 1474.709290606871
+    }
+  ]
+}

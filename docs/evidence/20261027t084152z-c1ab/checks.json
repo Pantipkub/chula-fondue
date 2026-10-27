@@ -1,0 +1,312 @@
+[
+  {
+    "name": "setup",
+    "status": "PASS",
+    "detail": {
+      "project": "chula-fondue-person3-20261027t084152z-c1ab",
+      "port": 31320,
+      "environment": "environment.json"
+    },
+    "durationMs": 33732.888583,
+    "finishedAt": "2026-10-27T08:42:26.599Z"
+  },
+  {
+    "name": "fixtures",
+    "status": "PASS",
+    "detail": {
+      "count": 100,
+      "assigned": 20,
+      "submitted": 80
+    },
+    "durationMs": 986.4677080000038,
+    "finishedAt": "2026-10-27T08:42:27.586Z"
+  },
+  {
+    "name": "performance",
+    "status": "PASS",
+    "detail": [
+      {
+        "name": "tickets-list",
+        "startedAt": "2026-10-27T08:42:37.611Z",
+        "finishedAt": "2026-10-27T08:43:37.688Z",
+        "model": "closed-loop; one in-flight request per worker; no think time",
+        "concurrency": 20,
+        "warmupSeconds": 10,
+        "scheduledSeconds": 60,
+        "elapsedIncludingDrainSeconds": 60.037122625,
+        "requests": 67200,
+        "errors": 0,
+        "errorRatePercent": 0,
+        "throughputPerSecond": 1119.3074728071213,
+        "p50Ms": 13.416999999986729,
+        "p95Ms": 27.678874999997788,
+        "p99Ms": 72.85649999999441,
+        "maxMs": 1070.5074999999924,
+        "statusCounts": {
+          "200": 67200
+        },
+        "errorCounts": {},
+        "responseBytes": 2526249600,
+        "target": {
+          "p95MsLessThan": 1000,
+          "errorRatePercentLessThan": 1
+        },
+        "raw": "tickets-list-samples.csv",
+        "status": "PASS"
+      },
+      {
+        "name": "ticket-history",
+        "startedAt": "2026-10-27T08:43:47.752Z",
+        "finishedAt": "2026-10-27T08:44:47.829Z",
+        "model": "closed-loop; one in-flight request per worker; no think time",
+        "concurrency": 20,
+        "warmupSeconds": 10,
+        "scheduledSeconds": 60,
+        "elapsedIncludingDrainSeconds": 60.016409375,
+        "requests": 69113,
+        "errors": 0,
+        "errorRatePercent": 0,
+        "throughputPerSecond": 1151.5683913737967,
+        "p50Ms": 9.42045799997868,
+        "p95Ms": 23.366207999992184,
+        "p99Ms": 54.967957999993814,
+        "maxMs": 3681.706333000009,
+        "statusCounts": {
+          "200": 69113
+        },
+        "errorCounts": {},
+        "responseBytes": 36616152,
+        "target": {
+          "p95MsLessThan": 1000,
+          "errorRatePercentLessThan": 1
+        },
+        "raw": "ticket-history-samples.csv",
+        "status": "PASS"
+      }
+    ],
+    "durationMs": 140351.783709,
+    "finishedAt": "2026-10-27T08:44:47.932Z"
+  },
+  {
+    "name": "raw-evidence-audit",
+    "status": "PASS",
+    "detail": {
+      "status": "PASS",
+      "auditedAt": "2026-10-27T08:44:48.213Z",
+      "method": "Recomputed from raw CSV; percentile tolerance 0.001ms for CSV rounding",
+      "endpoints": [
+        {
+          "name": "tickets-list",
+          "requests": 67200,
+          "errors": 0,
+          "workers": 20,
+          "uniquePaths": 1,
+          "p50Ms": 13.417,
+          "p95Ms": 27.679,
+          "p99Ms": 72.856,
+          "throughputPerSecond": 1119.3074728071213
+        },
+        {
+          "name": "ticket-history",
+          "requests": 69113,
+          "errors": 0,
+          "workers": 20,
+          "uniquePaths": 100,
+          "p50Ms": 9.42,
+          "p95Ms": 23.366,
+          "p99Ms": 54.968,
+          "throughputPerSecond": 1151.5683913737967
+        }
+      ]
+    },
+    "durationMs": 280.3855420000036,
+    "finishedAt": "2026-10-27T08:44:48.214Z"
+  },
+  {
+    "name": "functional",
+    "status": "PASS",
+    "detail": {
+      "lifecycleTicketId": "70fce266-7351-4c3c-9663-1e9140481277",
+      "historyStates": [
+        "SUBMITTED",
+        "ASSIGNED",
+        "IN_PROGRESS",
+        "RESOLVED",
+        "IN_PROGRESS",
+        "RESOLVED",
+        "CLOSED"
+      ],
+      "cancelledId": "f2112ba5-8b75-4539-b60f-d2d27adb524b",
+      "rejectedId": "574c9a4a-d281-4efc-a61c-721e33db9e66",
+      "unchangedId": "c146905c-c382-4710-b8ce-ccb3ec99a5e4",
+      "trace": "person3-trace-7ac202c6-32b1-47de-81af-b500918718d4",
+      "filters": 5,
+      "visibleTicketsAfter": 103,
+      "totalTicketsAfter": 104
+    },
+    "durationMs": 198.59679099998903,
+    "finishedAt": "2026-10-27T08:44:48.413Z"
+  },
+  {
+    "name": "request-correlation",
+    "status": "PASS",
+    "detail": {
+      "requestId": "person3-trace-7ac202c6-32b1-47de-81af-b500918718d4",
+      "services": [
+        "department-service",
+        "ticket-service",
+        "api-gateway"
+      ],
+      "records": 5
+    },
+    "durationMs": 294.84795799999847,
+    "finishedAt": "2026-10-27T08:44:48.708Z"
+  },
+  {
+    "name": "discovery-and-persistence",
+    "status": "PASS",
+    "detail": {
+      "before": {
+        "department": {
+          "id": "6d321167-f0b0-4887-925e-f56c2cdc6221",
+          "name": "Person 3 20261027t084152z-c1ab",
+          "contactEmail": "person3-department@example.com",
+          "buildings": [
+            "P3-TEST"
+          ],
+          "createdAt": "2026-10-27T08:42:26.000Z",
+          "updatedAt": "2026-10-27T08:42:26.000Z"
+        },
+        "history": {
+          "history": [
+            {
+              "fromStatus": "",
+              "toStatus": "SUBMITTED",
+              "note": "Ticket created",
+              "changedAt": "2026-10-27T08:42:26.658Z"
+            },
+            {
+              "fromStatus": "SUBMITTED",
+              "toStatus": "ASSIGNED",
+              "note": "Assigned to Person 3 20261027t084152z-c1ab",
+              "changedAt": "2026-10-27T08:42:26.733Z"
+            }
+          ],
+          "ticket": {
+            "id": "c742cfe4-1a40-4882-b54b-67a3a26f8a55",
+            "category": "Verification",
+            "location": "P3-TEST-0",
+            "description": "Isolated fixture 20261027t084152z-c1ab, item 0",
+            "photoUrl": "",
+            "reporterEmail": "person3-0@example.com",
+            "status": "ASSIGNED",
+            "departmentId": "6d321167-f0b0-4887-925e-f56c2cdc6221",
+            "departmentName": "Person 3 20261027t084152z-c1ab",
+            "reason": "",
+            "createdAt": "2026-10-27T08:42:26.658Z",
+            "updatedAt": "2026-10-27T08:42:26.733Z"
+          }
+        }
+      },
+      "dnsBefore": {
+        "endpoints": {
+          "department": "http://department-service:3001",
+          "ticket": "ticket-service:50051"
+        },
+        "dns": {
+          "department-service": [
+            {
+              "address": "192.168.0.2",
+              "family": 4
+            }
+          ],
+          "ticket-service": [
+            {
+              "address": "192.168.0.3",
+              "family": 4
+            }
+          ]
+        }
+      },
+      "gatewayBefore": "75fb190de7e6ac0b181bc3a90e42fb72932e11750a03200d7742238eb7e850a9",
+      "recreations": [
+        {
+          "service": "department-service",
+          "idBefore": "acc0b91fe549839c7056412ccb43c0b37aa6a0a8625cce450d75f247dc81a448",
+          "idAfter": "d7f7ddf0eb9fc0277156c30c16f57f644524a8833a21665edd4546f8dba69400",
+          "dnsAfter": {
+            "endpoints": {
+              "department": "http://department-service:3001",
+              "ticket": "ticket-service:50051"
+            },
+            "dns": {
+              "department-service": [
+                {
+                  "address": "192.168.0.2",
+                  "family": 4
+                }
+              ],
+              "ticket-service": [
+                {
+                  "address": "192.168.0.3",
+                  "family": 4
+                }
+              ]
+            }
+          },
+          "recordsAndHistory": "unchanged"
+        },
+        {
+          "service": "ticket-service",
+          "idBefore": "c96bdfe8db1439f3363c9b1632dc361ec436bcd23670813c44085a438606b73d",
+          "idAfter": "5f78cf7aef97cdef58b629824aa18d97aeb383d4fa91241524d6a12918b02a1b",
+          "dnsAfter": {
+            "endpoints": {
+              "department": "http://department-service:3001",
+              "ticket": "ticket-service:50051"
+            },
+            "dns": {
+              "department-service": [
+                {
+                  "address": "192.168.0.2",
+                  "family": 4
+                }
+              ],
+              "ticket-service": [
+                {
+                  "address": "192.168.0.3",
+                  "family": 4
+                }
+              ]
+            }
+          },
+          "recordsAndHistory": "unchanged"
+        }
+      ]
+    },
+    "durationMs": 15454.184500000003,
+    "finishedAt": "2026-10-27T08:45:04.162Z"
+  },
+  {
+    "name": "dependency-failures",
+    "status": "FAIL",
+    "error": "one or more dependency fault checks failed; see failure.json",
+    "durationMs": 17480.88604099999,
+    "finishedAt": "2026-10-27T08:45:21.643Z"
+  },
+  {
+    "name": "restoration",
+    "status": "PASS",
+    "durationMs": 202.98920899999212,
+    "detail": {
+      "readiness": 200,
+      "allUnpaused": true
+    }
+  },
+  {
+    "name": "shutdown",
+    "status": "PASS",
+    "durationMs": 650.4106249999895,
+    "detail": "containers/network removed; named volumes retained"
+  }
+]

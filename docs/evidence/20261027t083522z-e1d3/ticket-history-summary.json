@@ -1,0 +1,29 @@
+{
+  "name": "ticket-history",
+  "startedAt": "2026-10-27T08:37:19.367Z",
+  "finishedAt": "2026-10-27T08:38:19.424Z",
+  "model": "closed-loop; one in-flight request per worker; no think time",
+  "concurrency": 20,
+  "warmupSeconds": 10,
+  "scheduledSeconds": 60,
+  "elapsedIncludingDrainSeconds": 60.00640299999999,
+  "requests": 88492,
+  "errors": 0,
+  "errorRatePercent": 0,
+  "throughputPerSecond": 1474.709290606871,
+  "p50Ms": 6.449708000000101,
+  "p95Ms": 16.525000000023283,
+  "p99Ms": 42.138000000006286,
+  "maxMs": 3469.471499999985,
+  "statusCounts": {
+    "200": 88492
+  },
+  "errorCounts": {},
+  "responseBytes": 46883388,
+  "target": {
+    "p95MsLessThan": 1000,
+    "errorRatePercentLessThan": 1
+  },
+  "raw": "ticket-history-samples.csv",
+  "status": "PASS"
+}

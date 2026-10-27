@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "tsc -p . && node dist/main.js"
+    "build": "tsc -p .",
+    "start": "npm run build && node --env-file-if-exists=../../.env dist/main.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",
