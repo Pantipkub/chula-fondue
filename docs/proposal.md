@@ -84,7 +84,7 @@ The product requires registered and restricted guest access; a primarily Thai re
 
 **Actor:** Reporter. **Precondition:** ticket exists; target access must respect ownership. The reporter lists reports, filters them and opens a status timeline. **Postcondition:** current state and ordered history are available; unknown IDs return 404.
 
-**Implemented:** list/history APIs and status, departmentId, reporterEmail and includeCancelled filters. **Proposed:** My Tickets UI, ownership enforcement and media display. The current reporterEmail filter is not an access-control mechanism.
+**Implemented:** ticket list/history APIs and status, departmentId, reporterEmail and includeCancelled filters. There is no individual `GET /tickets/:id` detail route in the current Gateway contract; a caller can read a ticket through its history response. **Proposed:** My Tickets UI, ownership enforcement and media display. The current reporterEmail filter is not an access-control mechanism.
 
 <!-- pagebreak -->
 
@@ -230,7 +230,7 @@ Original requirements remain intact. The progress benchmark uses a provisional p
 
 | Requirement | Target | Mechanism | Verification | Measured result | Limitation |
 | --- | --- | --- | --- | --- | --- |
-| Ticket status/history latency [R1] | Original: within 1s. Progress: p95 <1s, errors <1% | Gateway REST to gRPC, owned SQLite reads, bounded calls | 100 tickets, 20 workers, 10s warm-up, 60s per endpoint; raw CSV audit | PASS for provisional p95/error target: list 27.68ms, history 23.37ms, 0% errors | Max 1,070.51/3,681.71ms; an all-request 1s ceiling is not achieved in this run |
+| Ticket status/history latency [R1] | Original: within 1s. Progress: p95 <1s, errors <1% | Gateway REST to gRPC, owned SQLite reads, bounded calls | 100 tickets, 20 workers, 10s warm-up, 60s per endpoint; raw CSV audit | PASS for provisional p95/error target on list/history reads: list 27.68ms, history 23.37ms, 0% errors | Max 1,070.51/3,681.71ms; an all-request 1s ceiling is not achieved. No individual ticket-detail route exists, so that exact query is NOT_RUN |
 | Bounded REST dependency wait | 2s budget; test tolerance <3.2s | Abort timeout covers request/body and assignment lookup | Stop/freeze Department; HTTP timing and state snapshots | PASS: stopped proxy/assign 503; frozen proxy 2,010.14ms and assign 2,061.19ms, both 504 | Frozen peer, not a calibrated network-delay experiment; scheduling adds delay |
 | Bounded Ticket wait and meaningful status | 3s deadline; tolerance <4.2s; stopped expectation 503 | Native gRPC deadline and code mapping | Stop/freeze Ticket; liveness/readiness and independent route | Frozen PASS: 504 in 3,017.00ms. Stopped FAIL: 504 in 3,027.05ms vs 503 | Mapping follows observed deadline; transport cause and stronger status expectation remain open |
 | Assignment consistency | No state/history change when Department lookup fails before commit | Validation before write; one ticket/history transaction; cancellation checks | Deep compare before/during/after Department faults | PASS: SUBMITTED fixture and full history unchanged | Deadline after commit can be uncertain; no distributed transaction/idempotency guarantee |
