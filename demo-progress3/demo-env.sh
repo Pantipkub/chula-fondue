@@ -23,6 +23,9 @@ envval() { grep "^$1=" .env | head -n 1 | cut -d= -f2-; }
 G=http://localhost:3000
 J='Content-Type: application/json'
 
+# Forget the values of an earlier run, so a failed setup can never leave stale ids behind
+unset ADMIN STUDENT DEPT TICKET TICKET2 EXPIRED
+
 if [ "$(curl -s -o /dev/null -w '%{http_code}' "$G/health/ready")" != 200 ]; then
   echo "The system is not ready. Run 'docker compose up -d --build', wait until 'docker compose ps' shows (healthy), then source this again."
   return 1
@@ -47,9 +50,15 @@ STUDENT=$(curl -s -X POST "$G/auth/login" -H "$J" \
 
 # newticket = the student reports a new issue; prints its id. Use TICKET=$(newticket) before a retake.
 newticket() {
-  curl -s -X POST "$G/tickets" -H "Authorization: Bearer $STUDENT" \
+  _reply=$(curl -s -X POST "$G/tickets" -H "Authorization: Bearer $STUDENT" \
     -F category=Electrical -F "location=ENG4 room 401" -F "description=Flickering light" \
-    -F photos=@demo-progress2/photos/issue-1.png | json .id
+    -F photos=@demo-progress2/photos/issue-1.png)
+  _id=$(printf '%s' "$_reply" | node -pe "JSON.parse(require('fs').readFileSync(0,'utf8')).id || ''" 2>/dev/null)
+  if [ -z "$_id" ]; then
+    echo "newticket failed: $_reply" >&2
+    return 1
+  fi
+  echo "$_id"
 }
 TICKET=$(newticket)   # scene 4
 TICKET2=$(newticket)  # scene 5
@@ -60,6 +69,14 @@ EXPIRED=$(JWT_SECRET="$(envval JWT_SECRET)" node -e '
   const now = Math.floor(Date.now() / 1000);
   console.log(jwt.sign({ sub: "demo", email: "admin@chula.ac.th", role: "ADMIN", departmentId: "", iat: now - 7200, exp: now - 3600 },
     process.env.JWT_SECRET, { algorithm: "HS256" }));')
+
+for _value in "$DEPT" "$STUDENT" "$TICKET" "$TICKET2" "$EXPIRED"; do
+  case "$_value" in
+    "" | undefined | null)
+      echo "Setup did not finish (DEPT='$DEPT' TICKET='$TICKET' TICKET2='$TICKET2'). Check 'docker compose ps', then source this again."
+      return 1 ;;
+  esac
+done
 
 echo "Ready to record.  DEPT=$DEPT  TICKET=$TICKET  TICKET2=$TICKET2"
 echo "Type 'clear' before you start recording."
