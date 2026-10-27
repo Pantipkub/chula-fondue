@@ -1,11 +1,16 @@
+import { randomUUID } from 'node:crypto';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ClientProxy, RpcException } from '@nestjs/microservices';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ClientProxy, RmqRecordBuilder, RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { currentRequestId } from './request-context.js';
 import { Ticket, TicketHistory } from './ticket.entity.js';
 
+// In Docker Compose this is http://department-service:3001: a name that Docker DNS resolves.
 const DEPARTMENT_SERVICE_URL = process.env.DEPARTMENT_SERVICE_URL ?? 'http://localhost:3001';
+/** How long an assignment waits for Department Service before failing with DEADLINE_EXCEEDED. */
+const DEPARTMENT_TIMEOUT_MS = Number(process.env.DEPARTMENT_TIMEOUT_MS ?? 3000);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const rpcError = (code: GrpcStatus, message: string) => new RpcException({ code, message });
@@ -27,7 +32,7 @@ function requirePhotos(field: string, urls: string[] | undefined) {
 }
 
 @Injectable()
-export class TicketsService {
+export class TicketsService implements OnModuleInit {
   private readonly logger = new Logger('TicketService');
 
   constructor(
@@ -35,6 +40,12 @@ export class TicketsService {
     @InjectRepository(TicketHistory) private readonly history: Repository<TicketHistory>,
     @Inject('NOTIFICATION_BROKER') private readonly broker: ClientProxy,
   ) {}
+
+  // Connect to RabbitMQ at startup instead of on the first event, so /health/ready can report the broker.
+  // The client reconnects by itself (amqp-connection-manager) if the broker restarts later.
+  onModuleInit() {
+    this.broker.connect().catch((error) => this.logger.warn(`RabbitMQ not reachable yet, will retry: ${error}`));
+  }
 
   create(req: Pick<Ticket, 'category' | 'location' | 'description' | 'photoUrls' | 'reporterEmail'>) {
     requireFields(req, 'category', 'location', 'description', 'reporterEmail');
@@ -144,8 +155,15 @@ export class TicketsService {
 
   // Drops the event on RabbitMQ and returns without waiting for Notification Service.
   // The event carries everything an email needs, so the consumer never calls back here.
+  // eventId lets the consumer drop a redelivered copy; requestId joins the logs of all three services.
+  // ponytail: the ticket is committed before the event is published. If the broker is down at that moment the
+  // event is lost (logged below); a transactional outbox would close that gap.
   private publishStatusChanged(ticket: Ticket, recipientEmail: string) {
+    const eventId = randomUUID();
+    const requestId = currentRequestId();
     const event = {
+      eventId,
+      requestId,
       ticketId: ticket.id,
       status: ticket.status,
       recipientEmail,
@@ -154,10 +172,13 @@ export class TicketsService {
       description: ticket.description,
       changedAt: ticket.updatedAt,
     };
-    this.broker.emit('ticket.status_changed', event).subscribe({
-      next: () => this.logger.log(`Queued ticket.status_changed ticket=${ticket.id} status=${ticket.status}`),
+    const record = new RmqRecordBuilder(event).setOptions({ messageId: eventId, headers: { 'x-request-id': requestId } }).build();
+    const where = `eventId=${eventId} requestId=${requestId} ticket=${ticket.id} status=${ticket.status}`;
+    this.broker.emit('ticket.status_changed', record).subscribe({
+      // Completes after RabbitMQ has confirmed the message (publisher confirm).
+      complete: () => this.logger.log(`Queued ticket.status_changed ${where}`),
       // The status change is already committed; a broker failure must not undo it.
-      error: (error) => this.logger.warn(`Notification not queued, ignoring: ${error}`),
+      error: (error) => this.logger.error(`Event NOT queued (lost) ${where}: ${error}`),
     });
   }
 
@@ -165,8 +186,15 @@ export class TicketsService {
     const url = `${DEPARTMENT_SERVICE_URL}/departments/${encodeURIComponent(departmentId)}`;
     let response: Response;
     try {
-      response = await fetch(url);
-    } catch {
+      response = await fetch(url, {
+        headers: { 'X-Request-Id': currentRequestId() },
+        signal: AbortSignal.timeout(DEPARTMENT_TIMEOUT_MS),
+      });
+    } catch (error) {
+      if ((error as Error).name === 'TimeoutError') {
+        this.logger.error(`GET ${url} -> no answer within ${DEPARTMENT_TIMEOUT_MS} ms`);
+        throw rpcError(GrpcStatus.DEADLINE_EXCEEDED, `Department Service did not answer within ${DEPARTMENT_TIMEOUT_MS} ms`);
+      }
       this.logger.error(`GET ${url} -> unreachable`);
       throw rpcError(GrpcStatus.UNAVAILABLE, 'Department Service unreachable');
     }

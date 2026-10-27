@@ -1,0 +1,33 @@
+flowchart LR
+  users(["Reporter · Guest · Admin · Staff"])
+  gw["API Gateway<br/>NestJS · :3000<br/>JWT + role checks, photo upload"]
+  auth["Auth Service<br/>NestJS · :3002"]
+  dept["Department Service<br/>NestJS · :3001"]
+  ticket["Ticket Service<br/>NestJS · gRPC :50051"]
+  notif["Notification Service<br/>NestJS · RabbitMQ consumer"]
+  mq[["RabbitMQ<br/>durable queue: notifications"]]
+  authdb[("PostgreSQL<br/>auth")]
+  deptdb[("PostgreSQL<br/>department")]
+  ticketdb[("PostgreSQL<br/>ticket")]
+  mongo[("MongoDB<br/>notification")]
+  cloud["Cloudinary<br/>(optional, external)"]
+  gmail["Gmail API"]
+  analytics["Analytics Service"]
+
+  users -->|"REST/JSON over HTTP + Bearer JWT"| gw
+  gw -->|"REST"| auth
+  gw -->|"REST"| dept
+  gw -->|"gRPC + x-request-id, 5 s deadline"| ticket
+  ticket -->|"REST, 3 s timeout"| dept
+  ticket -->|"AMQP publish ticket.status_changed<br/>(persistent, publisher confirm)"| mq
+  mq -->|"AMQP consume, manual ack, prefetch 10"| notif
+  auth --> authdb
+  dept --> deptdb
+  ticket --> ticketdb
+  notif --> mongo
+  gw -.->|"HTTPS"| cloud
+  notif -.->|"Planned"| gmail
+  analytics -.-|"Planned"| mq
+
+  classDef planned stroke-dasharray: 5 5,color:#777
+  class gmail,analytics planned

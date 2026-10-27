@@ -1,21 +1,167 @@
-# Local infrastructure. RabbitMQ always runs here; Postgres is only used when the
-# *_DATABASE_URL variables are not set in .env (otherwise the services use Neon).
+# Chula Fondue, Progress 3: the whole system on one Docker network.
+#
+#   docker compose up -d --build               # everything (gateway on http://localhost:3000)
+#   docker compose up -d rabbitmq postgres     # infrastructure only, for `npm run dev` on the host
+#
+# Service discovery: every container on the "backend" network reaches the others by service name
+# (auth-service, ticket-service, rabbitmq, ...) through Docker's embedded DNS. No service holds another
+# container's IP, so a re-created container with a new IP is found again by name.
+#
+# Only the API Gateway is published to the host. The services behind it trust the gateway's role checks,
+# so they are deliberately unreachable from outside the network. Infrastructure ports are bound to
+# 127.0.0.1 only, for local debugging and for `npm run dev`.
+name: chula-fondue
+
+x-app: &app
+  restart: unless-stopped
+  networks: [backend]
+  # Secrets (JWT_SECRET, ADMIN_*, MONGODB_URL, CLOUDINARY_URL, ...) come from .env when it exists.
+  # Discovery addresses are set under `environment`, which wins over .env, so a host-style
+  # RABBITMQ_URL=...localhost... in .env cannot break the containers.
+  env_file:
+    - path: .env
+      required: false
+
+x-healthcheck: &healthcheck
+  interval: 5s
+  timeout: 4s
+  retries: 6
+  start_period: 20s
+
 services:
+  # ---------- infrastructure ----------
   rabbitmq:
     image: rabbitmq:4.3.6-management
+    hostname: rabbitmq # RabbitMQ keeps its data per host name; a fixed name keeps queued messages across re-creation
+    networks: [backend]
     ports:
-      - '5672:5672' # services connect here
-      - '15672:15672' # management page, guest / guest
+      - '127.0.0.1:5672:5672' # for services run on the host with npm run dev
+      - '127.0.0.1:15672:15672' # management page, guest / guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'check_port_connectivity']
+      <<: *healthcheck
+      timeout: 10s
+
   postgres:
     image: postgres:18-alpine
+    networks: [backend]
     environment:
       POSTGRES_USER: fondue
       POSTGRES_PASSWORD: fondue
     ports:
-      - '5433:5432'
+      - '127.0.0.1:5433:5432'
     volumes:
       - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
       - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'fondue']
+      <<: *healthcheck
+
+  # Local fallback for Notification Service; unused when MONGODB_URL in .env points at Atlas.
+  mongo:
+    image: mongo:8
+    networks: [backend]
+    ports:
+      - '127.0.0.1:27018:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.runCommand({ ping: 1 }).ok']
+      <<: *healthcheck
+
+  # ---------- application services ----------
+  auth-service:
+    <<: *app
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: auth-service } }
+    environment:
+      AUTH_PORT: 3002
+      AUTH_DATABASE_URL: ${AUTH_DATABASE_URL:-postgresql://fondue:fondue@postgres:5432/auth}
+    expose: ['3002']
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '/app/healthcheck.mjs', 'http://localhost:3002/health/ready']
+      <<: *healthcheck
+
+  department-service:
+    <<: *app
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: department-service } }
+    environment:
+      DEPARTMENT_PORT: 3001
+      DEPARTMENT_DATABASE_URL: ${DEPARTMENT_DATABASE_URL:-postgresql://fondue:fondue@postgres:5432/department}
+    expose: ['3001']
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '/app/healthcheck.mjs', 'http://localhost:3001/health/ready']
+      <<: *healthcheck
+
+  ticket-service:
+    <<: *app
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: ticket-service } }
+    environment:
+      TICKET_GRPC_URL: 0.0.0.0:50051
+      HEALTH_PORT: 8081
+      TICKET_DATABASE_URL: ${TICKET_DATABASE_URL:-postgresql://fondue:fondue@postgres:5432/ticket}
+      DEPARTMENT_SERVICE_URL: http://department-service:3001
+      DEPARTMENT_TIMEOUT_MS: 3000
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    expose: ['50051', '8081']
+    # Department Service is not listed: it is only needed when assigning, and a missing one gives a
+    # controlled error at that moment instead of blocking Ticket Service from starting.
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '/app/healthcheck.mjs', 'http://localhost:8081/health/ready']
+      <<: *healthcheck
+
+  notification-service:
+    <<: *app
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: notification-service } }
+    environment:
+      HEALTH_PORT: 8082
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      MONGODB_URL: ${MONGODB_URL:-mongodb://mongo:27017}
+    expose: ['8082']
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '/app/healthcheck.mjs', 'http://localhost:8082/health/ready']
+      <<: *healthcheck
+
+  api-gateway:
+    <<: *app
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: api-gateway } }
+    environment:
+      GATEWAY_PORT: 3000
+      GATEWAY_PUBLIC_URL: http://localhost:3000
+      AUTH_SERVICE_URL: http://auth-service:3002
+      DEPARTMENT_SERVICE_URL: http://department-service:3001
+      TICKET_SERVICE_URL: dns:///ticket-service:50051
+      REST_TIMEOUT_MS: 5000
+      GRPC_TIMEOUT_MS: 5000
+    ports:
+      - '3000:3000' # the only application port published to the host
+    # Waits for the first start only. Later restarts of these services do not restart the gateway:
+    # it finds them again by name and returns 503/504 while they are away.
+    depends_on:
+      auth-service: { condition: service_healthy }
+      department-service: { condition: service_healthy }
+      ticket-service: { condition: service_healthy }
+    healthcheck:
+      # Liveness only, so a downstream outage never makes Docker restart the gateway.
+      # Readiness of everything behind it: curl http://localhost:3000/health/ready
+      test: ['CMD', 'node', '/app/healthcheck.mjs', 'http://localhost:3000/health']
+      <<: *healthcheck
+
+networks:
+  backend:
+    name: fondue-backend
 
 volumes:
   postgres-data:
+  rabbitmq-data:
+  mongo-data:

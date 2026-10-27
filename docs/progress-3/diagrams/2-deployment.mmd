@@ -1,0 +1,31 @@
+flowchart TB
+  client(["Browser / curl / k6<br/>on the host"])
+  subgraph host["Host machine · Docker Compose project chula-fondue"]
+    direction TB
+    subgraph net["Docker network fondue-backend · embedded DNS resolves service names"]
+      direction LR
+      gw["api-gateway<br/>:3000"]
+      auth["auth-service<br/>:3002 (+/health)"]
+      dept["department-service<br/>:3001 (+/health)"]
+      ticket["ticket-service<br/>gRPC :50051 · health :8081"]
+      notif["notification-service<br/>health :8082"]
+      mq[["rabbitmq<br/>:5672 · mgmt :15672"]]
+      pg[("postgres<br/>:5432 · DBs auth/ticket/department")]
+      mongo[("mongo<br/>:27017 (local fallback)")]
+    end
+  end
+  atlas[("MongoDB Atlas<br/>when MONGODB_URL is set")]
+  cloud["Cloudinary<br/>when CLOUDINARY_URL is set"]
+
+  client -->|"published 0.0.0.0:3000"| gw
+  gw -->|"http://auth-service:3002"| auth
+  gw -->|"http://department-service:3001"| dept
+  gw -->|"dns:///ticket-service:50051"| ticket
+  ticket -->|"http://department-service:3001"| dept
+  ticket -->|"amqp://rabbitmq:5672"| mq
+  notif -->|"amqp://rabbitmq:5672"| mq
+  auth & dept & ticket -->|"postgres:5432"| pg
+  notif -->|"mongodb://mongo:27017"| mongo
+  notif -.-> atlas
+  gw -.-> cloud
+  client -.->|"127.0.0.1 only: 5672, 15672, 5433, 27018 (debug / npm run dev)"| mq

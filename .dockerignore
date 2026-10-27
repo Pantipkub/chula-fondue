@@ -1,0 +1,12 @@
+# Keep secrets, local builds and the host's node_modules (built for another OS) out of the images.
+.env
+.git
+**/node_modules
+**/dist
+**/*.sqlite
+services/api-gateway/uploads
+demo
+demo-progress2
+demo-progress3
+docs
+perf

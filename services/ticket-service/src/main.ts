@@ -4,7 +4,9 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module.js';
 
-const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
+// gRPC for the gateway (port 50051) plus a small HTTP port for health checks (8081).
+const app = await NestFactory.create(AppModule);
+app.connectMicroservice<MicroserviceOptions>({
   transport: Transport.GRPC,
   options: {
     package: 'ticket',
@@ -12,4 +14,6 @@ const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule,
     url: process.env.TICKET_GRPC_URL ?? '0.0.0.0:50051',
   },
 });
-await app.listen();
+app.enableShutdownHooks();
+await app.startAllMicroservices();
+await app.listen(process.env.HEALTH_PORT ?? 8081);

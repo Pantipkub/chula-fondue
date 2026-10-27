@@ -1,0 +1,31 @@
+sequenceDiagram
+  autonumber
+  actor A as Admin
+  participant G as API Gateway
+  participant T as Ticket Service
+  participant D as Department Service
+  participant DB as PostgreSQL (ticket)
+  participant Q as RabbitMQ
+  participant N as Notification Service
+  participant M as MongoDB
+
+  A->>G: POST /tickets/{id}/assign {departmentId}<br/>Authorization: Bearer JWT
+  G->>G: verify JWT (HS256, expiry) and role ADMIN, else 401/403
+  G->>T: gRPC AssignTicket · metadata x-request-id · deadline 5 s
+  T->>DB: load ticket, must be SUBMITTED (else FAILED_PRECONDITION → 409)
+  T->>D: GET /departments/{id} · X-Request-Id · timeout 3 s
+  alt department missing / unreachable / slow
+    D-->>T: 404 / no connection / no answer
+    T-->>G: NOT_FOUND / UNAVAILABLE / DEADLINE_EXCEEDED
+    G-->>A: 404 / 503 / 504
+  else department found
+    D-->>T: 200 {id, name, contactEmail}
+    T->>DB: one transaction: ticket.status = ASSIGNED + history row
+    T-)Q: publish ticket.status_changed {eventId, requestId, ...}
+    T-->>G: Ticket (ASSIGNED)
+    G-->>A: 200 Ticket · X-Request-Id
+  end
+  Note over A,G: The Admin's answer does not wait for the notification
+  Q-)N: deliver event (at least once)
+  N->>M: upsert by eventId (a duplicate is ignored)
+  N-)Q: ack after the record is stored

@@ -1,0 +1,31 @@
+sequenceDiagram
+  autonumber
+  actor A as Admin
+  participant G as API Gateway
+  participant T as Ticket Service
+  participant Q as RabbitMQ (durable queue)
+  participant N as Notification Service
+  participant M as MongoDB
+
+  Note over N: Notification Service is stopped (or crashed)
+  A->>G: POST /tickets/{id}/assign
+  G->>T: gRPC AssignTicket
+  T->>T: commit ASSIGNED + history
+  T-)Q: publish event (persistent) → broker confirms
+  T-->>G: Ticket (ASSIGNED)
+  G-->>A: 200 — the business flow is not blocked
+  Note over Q: event waits in "notifications" (messages = 1)
+  Note over N: Notification Service starts again
+  N->>Q: connect, consume (prefetch 10)
+  Q-)N: deliver the waiting event
+  alt MongoDB available
+    N->>M: upsert by eventId
+    N-)Q: ack → message removed
+  else MongoDB unavailable
+    N--)Q: nack + requeue after 5 s (retried until it is stored)
+  end
+  opt connection lost before the ack
+    Q-)N: redelivers the same event later
+    N->>M: upsert finds the eventId → "Duplicate ignored"
+    N-)Q: ack
+  end

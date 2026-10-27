@@ -1,17 +1,14 @@
 import { Module } from '@nestjs/common';
-import { MongoClient } from 'mongodb';
+import { HealthController } from './health.controller.js';
+import { NotificationStore } from './notification-store.js';
 import { NotificationsController } from './notifications.controller.js';
 
 @Module({
-  controllers: [NotificationsController],
+  controllers: [HealthController, NotificationsController],
   providers: [
     {
-      provide: 'NOTIFICATIONS',
-      // The driver connects on first use and retries, so a brief MongoDB outage at startup is not fatal.
-      useFactory: () =>
-        new MongoClient(process.env.MONGODB_URL ?? 'mongodb://localhost:27017')
-          .db('notification')
-          .collection('notifications'),
+      provide: NotificationStore,
+      useFactory: () => new NotificationStore(process.env.MONGODB_URL ?? 'mongodb://localhost:27017'),
     },
   ],
 })

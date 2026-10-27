@@ -1,4 +1,4 @@
-import { status as GrpcStatus } from '@grpc/grpc-js';
+import { Metadata, status as GrpcStatus } from '@grpc/grpc-js';
 import {
   BadRequestException,
   Body,
@@ -22,8 +22,9 @@ import { CurrentUser, Roles } from './auth.js';
 import type { AuthUser } from './auth.js';
 import { PhotosInterceptor, storePhotos } from './photo-storage.js';
 import type { UploadedPhoto } from './photo-storage.js';
+import { currentRequestId } from './request-context.js';
 
-type TicketRpc = (request: object) => Observable<unknown>;
+type TicketRpc = (request: object, metadata: Metadata, options: { deadline: number }) => Observable<unknown>;
 type TicketWithHistory = { ticket: { departmentId: string; reporterEmail: string }; history: unknown[] };
 
 const HTTP_STATUS_BY_GRPC_CODE: Record<number, number> = {
@@ -31,7 +32,11 @@ const HTTP_STATUS_BY_GRPC_CODE: Record<number, number> = {
   [GrpcStatus.INVALID_ARGUMENT]: 400,
   [GrpcStatus.FAILED_PRECONDITION]: 409,
   [GrpcStatus.UNAVAILABLE]: 503,
+  [GrpcStatus.DEADLINE_EXCEEDED]: 504,
 };
+
+/** How long one call to Ticket Service may take, including finding and connecting to it. */
+const GRPC_TIMEOUT_MS = Number(process.env.GRPC_TIMEOUT_MS ?? 5000);
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -166,12 +171,20 @@ export class TicketsController implements OnModuleInit {
     return result;
   }
 
+  // Every call carries the request id (for the logs) and a deadline, so a missing or slow Ticket Service
+  // ends in a 503/504 within GRPC_TIMEOUT_MS instead of a request that hangs.
   private async forward(rpc: string, request: object) {
+    const metadata = new Metadata();
+    metadata.set('x-request-id', currentRequestId());
     try {
-      return await firstValueFrom(this.ticketService[rpc](request));
+      return await firstValueFrom(this.ticketService[rpc](request, metadata, { deadline: Date.now() + GRPC_TIMEOUT_MS }));
     } catch (error) {
       const { code, details, message } = error as { code?: number; details?: string; message?: string };
-      throw new HttpException(details || message || 'Ticket Service error', HTTP_STATUS_BY_GRPC_CODE[code ?? -1] ?? 500);
+      const status = HTTP_STATUS_BY_GRPC_CODE[code ?? -1] ?? 500;
+      if (code === GrpcStatus.UNAVAILABLE && !details?.startsWith('Department')) {
+        throw new HttpException('Ticket Service unavailable, try again shortly', status);
+      }
+      throw new HttpException(details || message || 'Ticket Service error', status);
     }
   }
 }
