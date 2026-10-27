@@ -7,7 +7,7 @@ const protoLoader = require('@grpc/proto-loader');
 
 const idsFile = join(__dirname, '.ids');
 if (!existsSync(idsFile)) {
-  console.error('demo/.ids not found: run demo/rest-demo.sh first, it creates the departments.');
+  console.error('demo-progress2/.ids not found: run demo-progress2/rest-demo.sh first, it creates the departments.');
   process.exit(1);
 }
 const { DEPT_A, DEPT_B } = Object.fromEntries(

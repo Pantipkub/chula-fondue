@@ -1,11 +1,11 @@
 // Prints the notifications Notification Service recorded in MongoDB for one ticket.
-// Usage: node --env-file=.env demo/show-notifications.js <ticketId> [expectedCount]
+// Usage: node --env-file=.env demo-progress2/show-notifications.js <ticketId> [expectedCount]
 // Notifications arrive through RabbitMQ a moment after the status change, so this waits for them.
 const { MongoClient } = require('mongodb');
 
 const [ticketId, expected = '1'] = process.argv.slice(2);
 if (!ticketId) {
-  console.error('Usage: node --env-file=.env demo/show-notifications.js <ticketId> [expectedCount]');
+  console.error('Usage: node --env-file=.env demo-progress2/show-notifications.js <ticketId> [expectedCount]');
   process.exit(1);
 }
 

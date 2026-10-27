@@ -34,5 +34,5 @@ echo "-> $(waiting) message(s) waiting. 0 = Notification Service already took it
 echo
 echo "Ticket id: $TICKET"
 echo "After Notification Service is running, show its record with:"
-echo "  node --env-file=.env demo/show-notifications.js $TICKET"
+echo "  node --env-file=.env demo-progress2/show-notifications.js $TICKET"
 exit $FAILED

@@ -281,7 +281,7 @@
                 }
               ]
             },
-            "description": "Pick the files for the \"photos\" field before sending (samples are in demo/photos).",
+            "description": "Pick the files for the \"photos\" field before sending (samples are in demo-progress2/photos).",
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -588,7 +588,7 @@
                 }
               ]
             },
-            "description": "Pick the files for the \"photos\" field before sending (samples are in demo/photos).",
+            "description": "Pick the files for the \"photos\" field before sending (samples are in demo-progress2/photos).",
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -665,7 +665,7 @@
                 }
               ]
             },
-            "description": "Pick the files for the \"photos\" field before sending (samples are in demo/photos).",
+            "description": "Pick the files for the \"photos\" field before sending (samples are in demo-progress2/photos).",
             "body": {
               "mode": "formdata",
               "formdata": [

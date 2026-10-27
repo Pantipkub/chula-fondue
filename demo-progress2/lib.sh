@@ -5,7 +5,7 @@ FAILED=0
 if ! command -v node >/dev/null; then
   echo "node was not found, so this is probably WSL bash rather than Git Bash."
   echo "Run the script from a Git Bash terminal, or from PowerShell with:"
-  echo "  & 'C:\\Program Files\\Git\\bin\\bash.exe' demo/<script>.sh"
+  echo "  & 'C:\\Program Files\\Git\\bin\\bash.exe' demo-progress2/<script>.sh"
   exit 1
 fi
 

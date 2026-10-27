@@ -333,7 +333,7 @@ Diagram และตาราง operations:
 
 ## 8. ลำดับ demo ในคลิป
 
-ใช้สคริปต์ `demo/progress2-demo.sh` สำหรับขั้นที่ 1 ถึง 4 และ `demo/broker-demo.sh` สำหรับขั้นที่ 6 (วิธีรันอยู่ใน README) และเปิดหน้าจอของ Neon, MongoDB, RabbitMQ ประกอบ
+ใช้สคริปต์ `demo-progress2/progress2-demo.sh` สำหรับขั้นที่ 1 ถึง 4 และ `demo-progress2/broker-demo.sh` สำหรับขั้นที่ 6 (วิธีรันอยู่ใน README) และเปิดหน้าจอของ Neon, MongoDB, RabbitMQ ประกอบ
 
 1. Login เป็น Reporter แล้วแจ้งปัญหาพร้อมรูป 2 รูป (UC-01) เปิด link รูปให้เห็นว่าอยู่บน Cloudinary
 2. เรียกคำขอของ Admin ด้วยบัตรผ่านของ Reporter ให้เห็นว่าถูกปฏิเสธ

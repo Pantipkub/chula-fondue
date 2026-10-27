@@ -51,10 +51,10 @@ RabbitMQ's management page is http://localhost:15672 (user `guest`, password `gu
 From a second terminal. All of them can be run repeatedly and against a shared database, because each run creates its own departments, accounts and tickets.
 
 ```
-bash demo/progress2-demo.sh   # login + UC-01 report, UC-02 route, UC-03 resolve, through the gateway
-bash demo/broker-demo.sh      # the message broker on its own (see below)
-bash demo/rest-demo.sh        # R1-R8: REST CRUD directly on department-service
-bash demo/grpc-demo.sh        # G1-G8: gRPC CRUD directly on ticket-service (run rest-demo.sh first)
+bash demo-progress2/progress2-demo.sh   # login + UC-01 report, UC-02 route, UC-03 resolve, through the gateway
+bash demo-progress2/broker-demo.sh      # the message broker on its own (see below)
+bash demo-progress2/rest-demo.sh        # R1-R8: REST CRUD directly on department-service
+bash demo-progress2/grpc-demo.sh        # G1-G8: gRPC CRUD directly on ticket-service (run rest-demo.sh first)
 ```
 
 Each script prints every command before its output, followed by the status it got and the status it expected, and exits non-zero if any check failed. Passwords and tokens are shortened in the printed output.
@@ -62,19 +62,19 @@ Each script prints every command before its output, followed by the status it go
 On Windows, run them from a Git Bash terminal. In PowerShell, plain `bash` starts the WSL one, which has no Node.js and cannot reach the services (every call prints `HTTP 000`). From PowerShell use:
 
 ```
-& 'C:\Program Files\Git\bin\bash.exe' demo/progress2-demo.sh
+& 'C:\Program Files\Git\bin\bash.exe' demo-progress2/progress2-demo.sh
 ```
 
 ### Postman
 
-Import `demo/chula-fondue.postman_collection.json`, open the collection's Variables tab and set `adminPassword` to the `ADMIN_PASSWORD` from `.env`. Run folder 0 once, then the requests of folder 1 in order; tokens and ids are saved into variables automatically. In the two upload requests, pick the files for the `photos` field (samples are in `demo/photos`).
+Import `demo-progress2/chula-fondue.postman_collection.json`, open the collection's Variables tab and set `adminPassword` to the `ADMIN_PASSWORD` from `.env`. Run folder 0 once, then the requests of folder 1 in order; tokens and ids are saved into variables automatically. In the two upload requests, pick the files for the `photos` field (samples are in `demo-progress2/photos`).
 
 ### Showing that the broker keeps messages
 
 1. Start the system without Notification Service: `npm run dev:no-notification`
-2. `bash demo/broker-demo.sh`: the ticket is still assigned, and step B3 reports 1 message waiting (also visible on the RabbitMQ page under Queues, `notifications`)
+2. `bash demo-progress2/broker-demo.sh`: the ticket is still assigned, and step B3 reports 1 message waiting (also visible on the RabbitMQ page under Queues, `notifications`)
 3. In another terminal: `npm run notification`. Its log shows `Recorded to=... status=ASSIGNED` for the waiting message
-4. `node --env-file=.env demo/show-notifications.js <ticket id>` prints the MongoDB record
+4. `node --env-file=.env demo-progress2/show-notifications.js <ticket id>` prints the MongoDB record
 
 ## 5. Gateway API
 
@@ -128,7 +128,7 @@ Verified so far only with stand-ins:
 
 ## Notes
 
-- `grpcurl` is not installed on this machine, so `demo/grpc-demo.sh` runs `demo/grpc-demo.js`, a small Node script that loads the same `proto/ticket.proto`.
+- `grpcurl` is not installed on this machine, so `demo-progress2/grpc-demo.sh` runs `demo-progress2/grpc-demo.js`, a small Node script that loads the same `proto/ticket.proto`.
 - Services are compiled with `tsc` and run with `node`. The Nest CLI is not used because its current version crashes on Node 22.13.
 - The services are an npm workspace, so `npm run install:all` is a single `npm install` at the root.
 - All services use `synchronize: true`, so a changed entity alters the tables of whoever shares that database. Tell the team before changing an entity.
