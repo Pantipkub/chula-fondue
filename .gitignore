@@ -4,3 +4,6 @@ dist/
 demo/.ids
 .env
 services/api-gateway/uploads/
+
+# macOS Finder metadata
+.DS_Store

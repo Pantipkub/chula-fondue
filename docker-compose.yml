@@ -157,6 +157,22 @@ services:
       test: ['CMD', 'node', '/app/healthcheck.mjs', 'http://localhost:3000/health']
       <<: *healthcheck
 
+  # Web app (React, built by frontend/Dockerfile). nginx serves it and forwards /api and /uploads to the gateway
+  # by its Compose name, so the browser never needs CORS. Open http://localhost:8080
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    networks: [backend]
+    ports:
+      - '8080:80'
+    depends_on:
+      api-gateway: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/health']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
 networks:
   backend:
     name: fondue-backend
