@@ -52,3 +52,5 @@ The worker uses [users.messages.send](https://developers.google.com/workspace/gm
 ## Deployment boundaries
 
 This is a single-host course deployment. HTTPS, multi-host discovery, backups, shared rate limits and production schema migrations are deployment work. TypeORM uses `synchronize: true` for the local demo. Do not connect a production database without reviewed migrations. Old NFR evidence does not establish new performance or 99.5% term-long uptime. The current verification scripts create fresh fixtures and save evidence in `test-results/`.
+
+The MongoDB container requires a compatible host kernel. MongoDB documents a [kernel 6.19–7.0.13 incompatibility](https://www.mongodb.com/docs/manual/administration/production-notes/). CI uses the Ubuntu 22.04 runner because newer hosted images encountered this startup guard. The Windows Docker Desktop environment used for local verification starts the MongoDB container successfully.
