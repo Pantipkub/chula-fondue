@@ -10,3 +10,4 @@ services/api-gateway/uploads/
 playwright-report/
 test-results/
 *.tsbuildinfo
+.DS_Store
