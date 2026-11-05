@@ -2,7 +2,8 @@ name: Complete platform
 on: [push, pull_request]
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # MongoDB 8 currently rejects Linux >= 6.19; keep the CI host on a supported LTS.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
