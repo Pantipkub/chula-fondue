@@ -1,3 +1,5 @@
+import { BackgroundService } from './background.service.js';
+import { OutboxEvent } from './outbox.entity.js';
 import { Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -11,14 +13,19 @@ import { TicketsService } from './tickets.service.js';
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: process.env.TICKET_DATABASE_URL ?? 'postgresql://fondue:fondue@localhost:5433/ticket',
-      entities: [Ticket, TicketHistory],
+      entities: [Ticket, TicketHistory, OutboxEvent],
       synchronize: true,
       // Keep retrying while PostgreSQL starts; Docker restarts the container if it never comes up.
       retryAttempts: 20,
       retryDelay: 3000,
     }),
-    TypeOrmModule.forFeature([Ticket, TicketHistory]),
+    TypeOrmModule.forFeature([Ticket, TicketHistory, OutboxEvent]),
     ClientsModule.register([
+      { name: 'ANALYTICS_BROKER', transport: Transport.RMQ, options: {
+        urls: [process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672'],
+        queue: 'analytics', queueOptions: { durable: true }, persistent: true,
+        socketOptions: { heartbeatIntervalInSeconds: 5, reconnectTimeInSeconds: 2 },
+      } },
       {
         name: 'NOTIFICATION_BROKER',
         transport: Transport.RMQ,
@@ -35,6 +42,6 @@ import { TicketsService } from './tickets.service.js';
     ]),
   ],
   controllers: [HealthController, TicketsController],
-  providers: [TicketsService],
+  providers: [TicketsService, BackgroundService],
 })
 export class AppModule {}

@@ -28,7 +28,7 @@ async function verifyPassword(password: string, stored: string) {
 
 // The token payload API Gateway reads: who the caller is, their role and (for STAFF) their department.
 const signToken = (claims: { sub: string; email: string; role: AccountRole | 'GUEST'; departmentId: string }) =>
-  jwt.sign(claims, JWT_SECRET, { algorithm: 'HS256', expiresIn: '1d' });
+  jwt.sign(claims, JWT_SECRET, { algorithm: 'HS256', expiresIn: claims.role === 'GUEST' ? '30d' : '1d' });
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -54,6 +54,10 @@ export class AuthService implements OnModuleInit {
 
   register(dto: CredentialsDto) {
     return this.createUser(dto.email, dto.password, 'REPORTER', '');
+  }
+
+  async listUsers() {
+    return (await this.users.find({ order: { email: 'ASC' } })).map(publicUser);
   }
 
   createStaffOrAdmin(dto: CreateUserDto) {

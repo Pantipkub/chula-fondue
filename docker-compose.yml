@@ -19,7 +19,7 @@ x-app: &app
   # Discovery addresses are set under `environment`, which wins over .env, so a host-style
   # RABBITMQ_URL=...localhost... in .env cannot break the containers.
   env_file:
-    - path: .env
+    - path: ${FONDUE_ENV_FILE:-.env}
       required: false
 
 x-healthcheck: &healthcheck
@@ -30,15 +30,27 @@ x-healthcheck: &healthcheck
 
 services:
   # ---------- infrastructure ----------
+  rabbitmq-volume-init:
+    image: rabbitmq:4.3.6-management
+    user: root
+    entrypoint: ['/bin/sh', '-ec']
+    command:
+      - 'chown -R rabbitmq:rabbitmq /var/lib/rabbitmq; chmod 700 /var/lib/rabbitmq; if [ -f /var/lib/rabbitmq/.erlang.cookie ]; then chmod 600 /var/lib/rabbitmq/.erlang.cookie; fi'
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks: [backend]
+
   rabbitmq:
     image: rabbitmq:4.3.6-management
     hostname: rabbitmq # RabbitMQ keeps its data per host name; a fixed name keeps queued messages across re-creation
     networks: [backend]
     ports:
-      - '127.0.0.1:5672:5672' # for services run on the host with npm run dev
-      - '127.0.0.1:15672:15672' # management page, guest / guest
+      - '127.0.0.1:${RABBITMQ_PORT:-5672}:5672' # for services run on the host with npm run dev
+      - '127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672' # management page, guest / guest
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+    depends_on:
+      rabbitmq-volume-init: { condition: service_completed_successfully }
     healthcheck:
       test: ['CMD', 'rabbitmq-diagnostics', '-q', 'check_port_connectivity']
       <<: *healthcheck
@@ -51,7 +63,7 @@ services:
       POSTGRES_USER: fondue
       POSTGRES_PASSWORD: fondue
     ports:
-      - '127.0.0.1:5433:5432'
+      - '127.0.0.1:${POSTGRES_PORT:-5433}:5432'
     volumes:
       - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
       - postgres-data:/var/lib/postgresql
@@ -64,7 +76,7 @@ services:
     image: mongo:8
     networks: [backend]
     ports:
-      - '127.0.0.1:27018:27017'
+      - '127.0.0.1:${MONGO_PORT:-27018}:27017'
     volumes:
       - mongo-data:/data/db
     healthcheck:
@@ -137,14 +149,18 @@ services:
     build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: api-gateway } }
     environment:
       GATEWAY_PORT: 3000
-      GATEWAY_PUBLIC_URL: http://localhost:3000
+      GATEWAY_PUBLIC_URL: ${GATEWAY_PUBLIC_URL:-}
+      ANALYTICS_SERVICE_URL: http://analytics-service:3003
+      NOTIFICATION_SERVICE_URL: http://notification-service:8082
       AUTH_SERVICE_URL: http://auth-service:3002
       DEPARTMENT_SERVICE_URL: http://department-service:3001
       TICKET_SERVICE_URL: dns:///ticket-service:50051
       REST_TIMEOUT_MS: 5000
       GRPC_TIMEOUT_MS: 5000
+    volumes:
+      - uploads:/app/services/api-gateway/uploads
     ports:
-      - '3000:3000' # the only application port published to the host
+      - '127.0.0.1:${GATEWAY_PORT_HOST:-3000}:3000' # the only application port published to the host
     # Waits for the first start only. Later restarts of these services do not restart the gateway:
     # it finds them again by name and returns 503/504 while they are away.
     depends_on:
@@ -157,11 +173,38 @@ services:
       test: ['CMD', 'node', '/app/healthcheck.mjs', 'http://localhost:3000/health']
       <<: *healthcheck
 
+  analytics-service:
+    <<: *app
+    build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: analytics-service } }
+    environment:
+      ANALYTICS_PORT: 3003
+      ANALYTICS_DATABASE_URL: ${ANALYTICS_DATABASE_URL:-postgresql://fondue:fondue@postgres:5432/analytics}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    expose: ['3003']
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '/app/healthcheck.mjs', 'http://localhost:3003/health/ready']
+      <<: *healthcheck
+
+  frontend:
+    restart: unless-stopped
+    build: { context: ., dockerfile: frontend/Dockerfile }
+    networks: [backend]
+    ports: ['127.0.0.1:${WEB_PORT:-8080}:80']
+    depends_on:
+      api-gateway: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1/health']
+      <<: *healthcheck
+
 networks:
   backend:
-    name: fondue-backend
+
 
 volumes:
   postgres-data:
   rabbitmq-data:
   mongo-data:
+  uploads:

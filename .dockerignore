@@ -10,3 +10,8 @@ demo-progress2
 demo-progress3
 docs
 perf
+
+.env.*
+test-results
+tests
+frontend/node_modules

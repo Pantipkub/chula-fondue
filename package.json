@@ -2,19 +2,31 @@
   "name": "chula-fondue",
   "private": true,
   "workspaces": [
-    "services/*"
+    "services/*",
+    "frontend"
   ],
   "scripts": {
     "install:all": "npm install",
-    "dev": "concurrently -n department,auth,ticket,notification,gateway -c blue,cyan,green,yellow,magenta \"npm start -w department-service\" \"npm start -w auth-service\" \"npm start -w ticket-service\" \"npm start -w notification-service\" \"npm start -w api-gateway\"",
+    "dev": "concurrently -n department,auth,ticket,notification,gateway -c blue,cyan,green,yellow,magenta \"npm start -w department-service\" \"npm start -w auth-service\" \"npm start -w ticket-service\" \"npm start -w notification-service\" \"npm start -w api-gateway\" \"npm start -w analytics-service\"",
     "dev:no-notification": "concurrently -n department,auth,ticket,gateway -c blue,cyan,green,magenta \"npm start -w department-service\" \"npm start -w auth-service\" \"npm start -w ticket-service\" \"npm start -w api-gateway\"",
-    "notification": "npm start -w notification-service"
+    "notification": "npm start -w notification-service",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "test:e2e": "node --env-file-if-exists=.env.demo tests/e2e.mjs",
+    "test:ui": "node tests/ui.mjs",
+    "dev:web": "npm run dev -w chula-fondue-frontend",
+    "setup:demo": "node scripts/setup-demo.mjs",
+    "seed:demo": "node --env-file-if-exists=.env.demo scripts/seed-demo.mjs",
+    "test:recovery": "node --env-file-if-exists=.env.demo tests/recovery.mjs",
+    "test:ui:live": "node tests/ui-live.mjs"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.20.5",
     "concurrently": "^10.0.5",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "@playwright/test": "^1.56.1"
   }
 }

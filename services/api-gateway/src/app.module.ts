@@ -1,3 +1,5 @@
+import { NotificationsController } from './notifications.controller.js';
+import { AnalyticsController } from './analytics.controller.js';
 import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
@@ -32,7 +34,7 @@ import { TicketsController } from './tickets.controller.js';
       },
     ]),
   ],
-  controllers: [HealthController, AuthController, TicketsController, DepartmentsController],
+  controllers: [HealthController, AuthController, TicketsController, DepartmentsController, AnalyticsController, NotificationsController],
   providers: [{ provide: APP_GUARD, useClass: AuthGuard }],
 })
 export class AppModule {}

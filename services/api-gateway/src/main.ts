@@ -7,6 +7,12 @@ import { requestContext } from './request-context.js';
 
 const app = await NestFactory.create<NestExpressApplication>(AppModule);
 app.use(requestContext);
+app.use((req: any, res: any, next: () => void) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  res.setHeader('X-Frame-Options', 'DENY');
+  next();
+});
 // Only used by the local photo fallback; with CLOUDINARY_URL set, photo links point at Cloudinary.
 app.useStaticAssets(UPLOADS_DIR, { prefix: '/uploads' });
 // Lets `docker compose stop` finish open requests instead of cutting them.

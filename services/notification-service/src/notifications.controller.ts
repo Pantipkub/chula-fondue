@@ -38,7 +38,7 @@ export class NotificationsController implements OnModuleInit {
       // This iteration records the notification only. Sending through the Gmail API goes here,
       // after which `delivery` becomes SENT or FAILED.
       const notifications = await this.store.collection();
-      const record = { ...event, receivedAt: new Date().toISOString(), delivery: 'RECORDED' };
+      const record = { ...event, receivedAt: new Date().toISOString(), delivery: process.env.EMAIL_MODE === 'gmail' ? 'PENDING' : 'RECORDED', attempts: 0, nextAttemptAt: new Date().toISOString() };
       if (event.eventId) {
         // RabbitMQ delivers at least once: a message can arrive again if this service died before its ack.
         // Inserting only when the eventId is new makes a second delivery harmless.

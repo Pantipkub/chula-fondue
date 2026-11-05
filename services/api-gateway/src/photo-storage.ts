@@ -10,7 +10,7 @@ const CLOUDINARY_URL = process.env.CLOUDINARY_URL; // cloudinary://<api_key>:<ap
 const PUBLIC_URL = process.env.GATEWAY_PUBLIC_URL ?? `http://localhost:${process.env.GATEWAY_PORT ?? 3000}`;
 
 /** Where photos go when CLOUDINARY_URL is not set; main.ts serves this folder at /uploads. */
-export const UPLOADS_DIR = join(import.meta.dirname, '..', 'uploads');
+export const UPLOADS_DIR = process.env.UPLOADS_DIR ?? join(import.meta.dirname, '..', 'uploads');
 
 /** Reads up to 5 files of at most 5 MB each from the multipart field "photos" into memory. */
 export const PhotosInterceptor = FilesInterceptor('photos', MAX_PHOTOS, { limits: { fileSize: MAX_PHOTO_BYTES } });
@@ -30,8 +30,10 @@ function imageExtension(data: Buffer) {
 
 /** Validates the uploaded photos, stores them and returns one public link per photo. */
 export async function storePhotos(files: UploadedPhoto[] | undefined): Promise<string[]> {
+  if (files && files.length > MAX_PHOTOS) throw new BadRequestException('Too many files');
   if (!files?.length) throw new BadRequestException('At least one photo is required (form field "photos")');
   const photos = files.map((file) => {
+    if (file.buffer.length > MAX_PHOTO_BYTES) throw new BadRequestException('File too large');
     const extension = imageExtension(file.buffer);
     if (!extension) throw new BadRequestException(`${file.originalname} is not a JPEG, PNG or WebP image`);
     return { data: file.buffer, extension };
@@ -50,7 +52,7 @@ async function uploadToCloudinary(data: Buffer, extension: string) {
   form.append('signature', createHash('sha1').update(`timestamp=${timestamp}${apiSecret}`).digest('hex'));
   let response: Response;
   try {
-    response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: form });
+    response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: form, signal: AbortSignal.timeout(15000) });
   } catch {
     throw new BadGatewayException('Photo storage unreachable');
   }
