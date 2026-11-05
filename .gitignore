@@ -4,3 +4,9 @@ dist/
 demo/.ids
 .env
 services/api-gateway/uploads/
+
+.env.*
+!.env.example
+playwright-report/
+test-results/
+*.tsbuildinfo

@@ -13,6 +13,7 @@ service TicketService {
   rpc ResolveTicket (ResolveTicketRequest) returns (Ticket);
   rpc ConfirmResolution (TicketIdRequest) returns (Ticket);
   rpc ReopenTicket (ReasonRequest) returns (Ticket);
+  rpc RecategorizeTicket (RecategorizeRequest) returns (Ticket);
 }
 
 message Ticket {
@@ -28,6 +29,10 @@ message Ticket {
   string reason = 10;
   string created_at = 11;
   string updated_at = 12;
+  string reporter_id = 14;
+  int32 version = 15;
+  string resolved_at = 16;
+  string closed_at = 17;
   repeated string completion_photo_urls = 13; // proof photos added when resolving
 }
 
@@ -44,12 +49,14 @@ message CreateTicketRequest {
   string description = 3;
   repeated string photo_urls = 4;   // at least one
   string reporter_email = 5;
+  string reporter_id = 6;
 }
 
 message ListTicketsRequest {
   string status = 1;            // optional filter
   string department_id = 2;     // optional filter
   string reporter_email = 3;    // optional filter
+  string reporter_id = 5;
   bool include_cancelled = 4;   // default false
 }
 
@@ -80,3 +87,5 @@ message ResolveTicketRequest {
   string id = 1;
   repeated string completion_photo_urls = 2;   // at least one
 }
+
+message RecategorizeRequest { string id = 1; string category = 2; }

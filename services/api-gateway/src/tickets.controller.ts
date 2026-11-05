@@ -25,10 +25,11 @@ import type { UploadedPhoto } from './photo-storage.js';
 import { currentRequestId } from './request-context.js';
 
 type TicketRpc = (request: object, metadata: Metadata, options: { deadline: number }) => Observable<unknown>;
-type TicketWithHistory = { ticket: { departmentId: string; reporterEmail: string }; history: unknown[] };
+type TicketWithHistory = { ticket: { departmentId: string; reporterEmail: string; reporterId: string; version: number }; history: unknown[] };
 
 const HTTP_STATUS_BY_GRPC_CODE: Record<number, number> = {
   [GrpcStatus.NOT_FOUND]: 404,
+  [GrpcStatus.ABORTED]: 409,
   [GrpcStatus.INVALID_ARGUMENT]: 400,
   [GrpcStatus.FAILED_PRECONDITION]: 409,
   [GrpcStatus.UNAVAILABLE]: 503,
@@ -62,9 +63,12 @@ export class TicketsController implements OnModuleInit {
     @UploadedFiles() photos?: UploadedPhoto[],
   ) {
     // A logged-in reporter is identified by the token; a guest has no account and must leave an address.
-    const reporterEmail = user.role === 'GUEST' ? body.contactEmail?.trim().toLowerCase() : user.email;
+    const reporterEmail = user.role === 'GUEST' && typeof body.contactEmail === 'string' ? body.contactEmail.trim().toLowerCase() : user.role === 'GUEST' ? '' : user.email;
     if (!reporterEmail || !EMAIL.test(reporterEmail)) {
       throw new BadRequestException('contactEmail must be a valid email address for guest reporters');
+    }
+    for (const field of ['category', 'location', 'description']) {
+      if (typeof body[field] !== 'string' || !body[field].trim() || body[field].length > 5000) throw new BadRequestException(`${field} is required and must be at most 5000 characters`);
     }
     const photoUrls = await storePhotos(photos);
     return this.forward('createTicket', {
@@ -73,6 +77,7 @@ export class TicketsController implements OnModuleInit {
       description: body.description,
       photoUrls,
       reporterEmail,
+      reporterId: user.sub,
     });
   }
 
@@ -80,10 +85,10 @@ export class TicketsController implements OnModuleInit {
   @Get()
   @Roles('ADMIN', 'STAFF', 'REPORTER')
   list(@CurrentUser() user: AuthUser, @Query() query: Record<string, string>) {
-    let scope: { departmentId?: string; reporterEmail?: string };
+    let scope: { departmentId?: string; reporterEmail?: string; reporterId?: string };
     if (user.role === 'ADMIN') scope = { departmentId: query.departmentId, reporterEmail: query.reporterEmail };
     else if (user.role === 'STAFF' && user.departmentId) scope = { departmentId: user.departmentId };
-    else if (user.role === 'REPORTER' && user.email) scope = { reporterEmail: user.email };
+    else if (user.role === 'REPORTER' && user.email) scope = { reporterId: user.sub, reporterEmail: user.email };
     else throw new ForbiddenException('Your account cannot list tickets');
     return this.forward('listTickets', {
       status: query.status,
@@ -92,10 +97,17 @@ export class TicketsController implements OnModuleInit {
     });
   }
 
-  // Guests have no ticket list, so knowing the ticket id is what lets them follow their report.
+  // Guest history requires the same guest JWT that created the report.
   @Get(':id/history')
   history(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.loadPermitted(user, id);
+  }
+
+  @Post(':id/category')
+  @HttpCode(200)
+  @Roles('ADMIN')
+  recategorize(@Param('id') id: string, @Body('category') category: string) {
+    return this.forward('recategorizeTicket', { id, category });
   }
 
   @Post(':id/assign')
@@ -108,8 +120,8 @@ export class TicketsController implements OnModuleInit {
   @Delete(':id')
   @Roles('REPORTER')
   async cancel(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    await this.loadPermitted(user, id);
-    return this.forward('cancelTicket', { id });
+    const permitted = await this.loadPermitted(user, id);
+    return this.forward('cancelTicket', { id }, permitted.ticket.version);
   }
 
   @Post(':id/reject')
@@ -123,8 +135,8 @@ export class TicketsController implements OnModuleInit {
   @HttpCode(200)
   @Roles('STAFF')
   async start(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    await this.loadPermitted(user, id);
-    return this.forward('startProgress', { id });
+    const permitted = await this.loadPermitted(user, id);
+    return this.forward('startProgress', { id }, permitted.ticket.version);
   }
 
   // multipart/form-data: photos (1-5 files)
@@ -133,36 +145,36 @@ export class TicketsController implements OnModuleInit {
   @Roles('STAFF')
   @UseInterceptors(PhotosInterceptor)
   async resolve(@CurrentUser() user: AuthUser, @Param('id') id: string, @UploadedFiles() photos?: UploadedPhoto[]) {
-    await this.loadPermitted(user, id);
+    const permitted = await this.loadPermitted(user, id);
     const completionPhotoUrls = await storePhotos(photos);
-    return this.forward('resolveTicket', { id, completionPhotoUrls });
+    return this.forward('resolveTicket', { id, completionPhotoUrls }, permitted.ticket.version);
   }
 
   @Post(':id/confirm')
   @HttpCode(200)
   @Roles('REPORTER')
   async confirm(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    await this.loadPermitted(user, id);
-    return this.forward('confirmResolution', { id });
+    const permitted = await this.loadPermitted(user, id);
+    return this.forward('confirmResolution', { id }, permitted.ticket.version);
   }
 
   @Post(':id/reopen')
   @HttpCode(200)
   @Roles('REPORTER')
   async reopen(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body('reason') reason: string) {
-    await this.loadPermitted(user, id);
-    return this.forward('reopenTicket', { id, reason });
+    const permitted = await this.loadPermitted(user, id);
+    return this.forward('reopenTicket', { id, reason }, permitted.ticket.version);
   }
 
   // Fetches the ticket and checks it is the caller's: Staff need the same department, a Reporter the same email.
   private async loadPermitted(user: AuthUser, id: string) {
     const result = (await this.forward('getTicketHistory', { id })) as TicketWithHistory;
-    const { departmentId, reporterEmail } = result.ticket;
+    const { departmentId, reporterEmail, reporterId } = result.ticket;
     const permitted =
       user.role === 'ADMIN' ||
-      user.role === 'GUEST' ||
+      (user.role === 'GUEST' && reporterId === user.sub) ||
       (user.role === 'STAFF' && !!departmentId && departmentId === user.departmentId) ||
-      (user.role === 'REPORTER' && reporterEmail === user.email);
+      (user.role === 'REPORTER' && (reporterId === user.sub || (!reporterId && reporterEmail === user.email)));
     if (!permitted) {
       throw new ForbiddenException(
         user.role === 'STAFF' ? 'This ticket is not assigned to your department' : 'This ticket is not yours',
@@ -173,9 +185,10 @@ export class TicketsController implements OnModuleInit {
 
   // Every call carries the request id (for the logs) and a deadline, so a missing or slow Ticket Service
   // ends in a 503/504 within GRPC_TIMEOUT_MS instead of a request that hangs.
-  private async forward(rpc: string, request: object) {
+  private async forward(rpc: string, request: object, expectedVersion?: number) {
     const metadata = new Metadata();
     metadata.set('x-request-id', currentRequestId());
+    if (expectedVersion !== undefined) metadata.set('x-expected-version', String(expectedVersion));
     try {
       return await firstValueFrom(this.ticketService[rpc](request, metadata, { deadline: Date.now() + GRPC_TIMEOUT_MS }));
     } catch (error) {

@@ -8,7 +8,7 @@ const CHECK_TIMEOUT_MS = 2000;
 // for Docker's healthcheck and for people checking the system.
 // /health       liveness
 // /health/ready PostgreSQL must answer. RabbitMQ is reported but does not make the service "not ready":
-//               tickets can still change status without it (those events are lost, see tickets.service.ts).
+//               tickets can still change status without it (events wait in the transactional outbox).
 @Controller('health')
 export class HealthController {
   private broker = 'connecting';

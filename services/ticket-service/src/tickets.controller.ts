@@ -23,6 +23,11 @@ export class TicketsController {
     return withRequestContext(metadata, 'GetTicketHistory', () => this.tickets.getHistory(req.id));
   }
 
+  @GrpcMethod('TicketService', 'RecategorizeTicket')
+  recategorizeTicket(req: { id: string; category: string }, metadata: Metadata) {
+    return withRequestContext(metadata, 'RecategorizeTicket', () => this.tickets.recategorize(req));
+  }
+
   @GrpcMethod('TicketService', 'AssignTicket')
   assignTicket(req: { id: string; departmentId: string }, metadata: Metadata) {
     return withRequestContext(metadata, 'AssignTicket', () => this.tickets.assign(req));

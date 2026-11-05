@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ClientProxy, RmqRecordBuilder, RpcException } from '@nestjs/microservices';
+import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { currentRequestId } from './request-context.js';
+import { LessThan, Repository } from 'typeorm';
+import { OutboxEvent } from './outbox.entity.js';
+import { currentExpectedVersion, currentRequestId } from './request-context.js';
 import { Ticket, TicketHistory } from './ticket.entity.js';
 
 // In Docker Compose this is http://department-service:3001: a name that Docker DNS resolves.
@@ -18,14 +19,14 @@ const rpcError = (code: GrpcStatus, message: string) => new RpcException({ code,
 function requireFields(req: object, ...fields: string[]) {
   for (const field of fields) {
     const value = (req as Record<string, unknown>)[field];
-    if (typeof value !== 'string' || !value.trim()) {
+    if (typeof value !== 'string' || !value.trim() || value.length > 5000) {
       throw rpcError(GrpcStatus.INVALID_ARGUMENT, `${field} is required`);
     }
   }
 }
 
 function requirePhotos(field: string, urls: string[] | undefined) {
-  if (!urls?.length || urls.some((url) => typeof url !== 'string' || !url.trim())) {
+  if (!urls?.length || urls.length > 5 || urls.some((url) => typeof url !== 'string' || !url.trim())) {
     throw rpcError(GrpcStatus.INVALID_ARGUMENT, `${field} needs at least one photo`);
   }
   return urls;
@@ -47,7 +48,7 @@ export class TicketsService implements OnModuleInit {
     this.broker.connect().catch((error) => this.logger.warn(`RabbitMQ not reachable yet, will retry: ${error}`));
   }
 
-  create(req: Pick<Ticket, 'category' | 'location' | 'description' | 'photoUrls' | 'reporterEmail'>) {
+  create(req: Pick<Ticket, 'category' | 'location' | 'description' | 'photoUrls' | 'reporterEmail'> & { reporterId?: string }) {
     requireFields(req, 'category', 'location', 'description', 'reporterEmail');
     const ticket = this.tickets.create({
       category: req.category,
@@ -56,17 +57,21 @@ export class TicketsService implements OnModuleInit {
       photoUrls: requirePhotos('photoUrls', req.photoUrls),
       completionPhotoUrls: [],
       reporterEmail: req.reporterEmail,
+      reporterId: req.reporterId ?? '',
     });
     return this.setStatus(ticket, 'SUBMITTED', 'Ticket created');
   }
 
-  async list(req: { status?: string; departmentId?: string; reporterEmail?: string; includeCancelled?: boolean }) {
+  async list(req: { status?: string; departmentId?: string; reporterEmail?: string; reporterId?: string; includeCancelled?: boolean }) {
+    const filters = {
+      ...(req.status && { status: req.status }),
+      ...(req.departmentId && { departmentId: req.departmentId }),
+    };
     const tickets = await this.tickets.find({
-      where: {
-        ...(req.status && { status: req.status }),
-        ...(req.departmentId && { departmentId: req.departmentId }),
-        ...(req.reporterEmail && { reporterEmail: req.reporterEmail }),
-      },
+      where: req.reporterId ? [
+        { ...filters, reporterId: req.reporterId },
+        { ...filters, reporterId: '', reporterEmail: req.reporterEmail ?? '__none__' },
+      ] : { ...filters, ...(req.reporterEmail && { reporterEmail: req.reporterEmail }) },
       order: { createdAt: 'DESC' },
     });
     return { tickets: req.includeCancelled ? tickets : tickets.filter((t) => t.status !== 'CANCELLED') };
@@ -76,6 +81,13 @@ export class TicketsService implements OnModuleInit {
     const ticket = await this.load(id);
     const history = await this.history.find({ where: { ticketId: ticket.id }, order: { id: 'ASC' } });
     return { ticket, history };
+  }
+
+  async recategorize(req: { id: string; category: string }) {
+    requireFields(req, 'category');
+    const ticket = await this.load(req.id, 'SUBMITTED', 'ASSIGNED');
+    ticket.category = req.category.trim();
+    return this.setStatus(ticket, ticket.status, `Category changed to ${ticket.category}`);
   }
 
   async assign(req: { id: string; departmentId: string }) {
@@ -119,8 +131,10 @@ export class TicketsService implements OnModuleInit {
   async reopen(req: { id: string; reason: string }) {
     const ticket = await this.load(req.id, 'RESOLVED');
     requireFields(req, 'reason');
+    const department = await this.fetchDepartment(ticket.departmentId);
     ticket.reason = req.reason;
-    return this.setStatus(ticket, 'IN_PROGRESS', req.reason, ticket.reporterEmail);
+    ticket.resolvedAt = '';
+    return this.setStatus(ticket, 'IN_PROGRESS', req.reason, department.contactEmail);
   }
 
   private async load(id: string, ...allowedStatuses: string[]) {
@@ -137,48 +151,43 @@ export class TicketsService implements OnModuleInit {
     return ticket;
   }
 
-  // Every status change goes through here: save the ticket, write one history row, then notify.
+  async closeExpiredResolutions() {
+    const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
+    const expired = await this.tickets.find({ where: { status: 'RESOLVED', updatedAt: LessThan(cutoff) }, take: 50 });
+    for (const ticket of expired) {
+      try { await this.setStatus(ticket, 'CLOSED', 'Automatically closed after 7 days', ticket.reporterEmail); }
+      catch (error) { if (!(error instanceof RpcException)) throw error; }
+    }
+  }
+
   private async setStatus(ticket: Ticket, toStatus: string, note: string, notifyEmail?: string) {
     const now = new Date().toISOString();
     const fromStatus = ticket.status ?? '';
-    ticket.status = toStatus;
-    ticket.createdAt ??= now;
-    ticket.updatedAt = now;
-    const saved = await this.tickets.manager.transaction(async (manager) => {
+    return this.tickets.manager.transaction(async (manager) => {
+      if (ticket.id) {
+        const current = await manager.findOne(Ticket, { where: { id: ticket.id }, lock: { mode: 'pessimistic_write' } });
+        const expectedVersion = currentExpectedVersion();
+        if (!current || current.version !== ticket.version || current.status !== fromStatus ||
+            (expectedVersion !== undefined && expectedVersion !== current.version)) {
+          throw rpcError(GrpcStatus.ABORTED, 'Ticket changed concurrently; reload and retry');
+        }
+      }
+      ticket.status = toStatus;
+      ticket.version = (ticket.version ?? 0) + 1;
+      ticket.createdAt ??= now;
+      ticket.updatedAt = now;
+      if (toStatus === 'RESOLVED') ticket.resolvedAt = now;
+      if (toStatus === 'CLOSED') ticket.closedAt = now;
       const saved = await manager.save(ticket);
       await manager.save(TicketHistory, { ticketId: saved.id, fromStatus, toStatus, note, changedAt: now });
+      const eventId = randomUUID();
+      // Ticket, history and outbox commit together; no broker call is made in the business transaction.
+      await manager.save(OutboxEvent, {
+        id: eventId, createdAt: now, notificationSent: !notifyEmail, analyticsSent: false,
+        payload: { ...saved, eventId, requestId: currentRequestId(), ticketId: saved.id,
+          recipientEmail: notifyEmail ?? '', changedAt: now, note, fromStatus },
+      });
       return saved;
-    });
-    if (notifyEmail) this.publishStatusChanged(saved, notifyEmail);
-    return saved;
-  }
-
-  // Drops the event on RabbitMQ and returns without waiting for Notification Service.
-  // The event carries everything an email needs, so the consumer never calls back here.
-  // eventId lets the consumer drop a redelivered copy; requestId joins the logs of all three services.
-  // ponytail: the ticket is committed before the event is published. If the broker is down at that moment the
-  // event is lost (logged below); a transactional outbox would close that gap.
-  private publishStatusChanged(ticket: Ticket, recipientEmail: string) {
-    const eventId = randomUUID();
-    const requestId = currentRequestId();
-    const event = {
-      eventId,
-      requestId,
-      ticketId: ticket.id,
-      status: ticket.status,
-      recipientEmail,
-      category: ticket.category,
-      location: ticket.location,
-      description: ticket.description,
-      changedAt: ticket.updatedAt,
-    };
-    const record = new RmqRecordBuilder(event).setOptions({ messageId: eventId, headers: { 'x-request-id': requestId } }).build();
-    const where = `eventId=${eventId} requestId=${requestId} ticket=${ticket.id} status=${ticket.status}`;
-    this.broker.emit('ticket.status_changed', record).subscribe({
-      // Completes after RabbitMQ has confirmed the message (publisher confirm).
-      complete: () => this.logger.log(`Queued ticket.status_changed ${where}`),
-      // The status change is already committed; a broker failure must not undo it.
-      error: (error) => this.logger.error(`Event NOT queued (lost) ${where}: ${error}`),
     });
   }
 

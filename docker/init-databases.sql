@@ -2,3 +2,5 @@
 CREATE DATABASE auth;
 CREATE DATABASE ticket;
 CREATE DATABASE department;
+
+CREATE DATABASE analytics;

@@ -54,6 +54,7 @@ export class AuthGuard implements CanActivate {
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
+    if (!user.sub || !['REPORTER', 'GUEST', 'ADMIN', 'STAFF'].includes(user.role)) throw new UnauthorizedException('Invalid token claims');
     request.user = user;
 
     const roles = this.reflector.getAllAndOverride<Role[]>('roles', targets);

@@ -1,0 +1,35 @@
+name: Complete platform
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run setup:demo
+      - run: docker compose --env-file .env.demo -p fondue-demo up -d --build --wait --wait-timeout 180
+      - run: npm run test:e2e
+      - run: npm run test:recovery
+      - run: npm run seed:demo
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
+        env:
+          WEB_URL: http://127.0.0.1:8080
+          BROWSER_CHANNEL: chromium
+      - run: npm run test:ui:live
+        env:
+          WEB_URL: http://127.0.0.1:8080
+          BROWSER_CHANNEL: chromium
+      - if: always()
+        run: mkdir -p test-results && docker compose --env-file .env.demo -p fondue-demo logs --no-color > test-results/compose.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-evidence
+          path: test-results/

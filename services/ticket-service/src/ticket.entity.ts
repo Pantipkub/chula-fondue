@@ -25,6 +25,18 @@ export class Ticket {
   @Column()
   reporterEmail: string;
 
+  @Column({ default: '' })
+  reporterId: string;
+
+  @Column({ default: 0 })
+  version: number;
+
+  @Column({ default: '' })
+  resolvedAt: string;
+
+  @Column({ default: '' })
+  closedAt: string;
+
   @Column()
   status: string;
 
