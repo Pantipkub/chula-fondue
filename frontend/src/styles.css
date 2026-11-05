@@ -332,3 +332,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .content .pagehead { flex-wrap: wrap; }
   .tabs { max-width: 100%; overflow-x: auto; }
 }
+.account-row { flex-wrap: wrap; }
+.account-row > .row { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.account-row .rolechip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }

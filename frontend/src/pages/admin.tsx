@@ -252,7 +252,7 @@ export function Users() {
           <ErrorBox error={accounts.error} />
           {!!accounts.data?.length && (
             <div className="card stack"><h3>บัญชีในระบบ</h3>
-              {accounts.data.map((c) => <div key={c.email} className="row between" style={{ padding: '10px 0', borderTop: '1px solid var(--line-200)' }}><span className="row small strong"><span className="avatar">{c.email.slice(0, 2)}</span>{c.email}</span><span className={`rolechip ${c.role === 'ADMIN' ? 'tone-pink' : 'tone-lilac'}`}>{c.role}{c.departmentId && ` · ${depts.data?.find(d => d.id === c.departmentId)?.name ?? ''}`}</span></div>)}
+              {accounts.data.map((c) => <div key={c.email} className="row between account-row" style={{ padding: '10px 0', borderTop: '1px solid var(--line-200)' }}><span className="row small strong"><span className="avatar">{c.email.slice(0, 2)}</span>{c.email}</span><span className={`rolechip ${c.role === 'ADMIN' ? 'tone-pink' : 'tone-lilac'}`}>{c.role}{c.departmentId && ` · ${depts.data?.find(d => d.id === c.departmentId)?.name ?? ''}`}</span></div>)}
               <span className="xs muted">ข้อมูลบัญชีจาก Auth Service</span>
             </div>
           )}

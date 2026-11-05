@@ -21,10 +21,10 @@ try {
       await page.setViewportSize({ width, height });
       for (const route of routes) {
         await page.goto(base + route); await page.waitForLoadState('networkidle');
+        await page.screenshot({ path: `test-results/live-${role}-${width}-${route.replaceAll('/', '-')}.png`, fullPage: true });
         const error = page.locator('[role=alert]');
         assert.equal(await error.count(), 0, `${role} ${route}: ${await error.allTextContents()}`);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `${role} ${route} overflow at ${width}`);
-        await page.screenshot({ path: `test-results/live-${role}-${width}-${route.replaceAll('/', '-')}.png`, fullPage: true });
       }
     }
     if (role === 'reporter') {
