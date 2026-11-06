@@ -16,7 +16,7 @@ export function Analytics() {
   const hours = (value: number | null) => value === null ? '—' : value >= 24 ? `${(value / 24).toFixed(1)} วัน` : `${value.toFixed(1)} ชม.`;
   return <>
     <PageHead title="รายงานวิเคราะห์" sub="ข้อมูลจาก Analytics Service • เวลาแก้ไขวัดจนถึงสถานะแก้ไขเสร็จ"><Button kind="outline" onClick={load.reload} busy={load.loading}>รีเฟรช</Button></PageHead>
-    <div className="card row wrap">
+    <div className="card analytics-filters">
       <Input id="from" type="date" label="ตั้งแต่วันที่" value={from} onChange={e => setFrom(e.target.value)} />
       <Input id="to" type="date" label="ถึงวันที่" value={to} onChange={e => setTo(e.target.value)} />
       <Select id="analytics-dept" label="หน่วยงาน" value={departmentId} onChange={e => setDepartment(e.target.value)}><option value="">ทั้งหมด</option>{departments.data?.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</Select>

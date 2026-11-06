@@ -15,6 +15,7 @@
     "test": "npm run build && node --test tests/*.test.mjs",
     "test:e2e": "node --env-file-if-exists=.env.demo tests/e2e.mjs",
     "test:ui": "node tests/ui.mjs",
+    "test:ui:responsive": "node tests/ui-responsive.mjs",
     "dev:web": "npm run dev -w chula-fondue-frontend",
     "setup:demo": "node scripts/setup-demo.mjs",
     "seed:demo": "node --env-file-if-exists=.env.demo scripts/seed-demo.mjs",

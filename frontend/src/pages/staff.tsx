@@ -80,7 +80,7 @@ export function Work() {
   return (
     <>
       <Crumb to="/staff" label="คิวงาน" current={shortId(t.id)} />
-      <div className="stack" style={{ ['--gap' as string]: '8px' }}><div className="row"><Badge status={t.status} /><span className="small muted strong">{shortId(t.id)}</span><span className="small muted">· แจ้งเมื่อ {fmtDate(t.createdAt)}</span></div><h1>{t.description.length > 70 ? t.description.slice(0, 70) + '…' : t.description}</h1></div>
+      <div className="stack" style={{ ['--gap' as string]: '8px' }}><div className="row wrap"><Badge status={t.status} /><span className="small muted strong">{shortId(t.id)}</span><span className="small muted">· แจ้งเมื่อ {fmtDate(t.createdAt)}</span></div><h1>{t.description.length > 70 ? t.description.slice(0, 70) + '…' : t.description}</h1></div>
       <div className="split">
         <div className="stack" style={{ ['--gap' as string]: '24px' }}>
           <Gallery urls={t.photoUrls} />

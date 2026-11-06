@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import {
   AlertTriangle, ArrowLeft, BarChart3, Bell, Building2, Calendar, Camera, Check, ChevronDown, ChevronRight, ClipboardList, Clock, Copy, Droplet, Eye,
-  Filter, Heart, ImageIcon, Inbox, Info, Loader2, LogOut, Lock, Mail, MapPin, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Route, Search, Send,
+  Filter, Heart, ImageIcon, Inbox, Info, Loader2, LogOut, Lock, Mail, MapPin, Menu, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Route, Search, Send,
   Shield, Sparkles, Ticket as TicketIcon, Trash2, Upload, User, Users, Wifi, Wind, Wrench, X, Zap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -13,7 +13,7 @@ import { STATUS, STEPS, describe, fmtShort, stepIndex } from '../lib/format';
 const ICONS: Record<string, LucideIcon> = {
   alert: AlertTriangle, back: ArrowLeft, chart: BarChart3, bell: Bell, building: Building2, calendar: Calendar, camera: Camera, check: Check, down: ChevronDown,
   right: ChevronRight, list: ClipboardList, clock: Clock, copy: Copy, droplet: Droplet, eye: Eye, filter: Filter, heart: Heart, image: ImageIcon, inbox: Inbox,
-  info: Info, loader: Loader2, logout: LogOut, lock: Lock, mail: Mail, pin: MapPin, more: MoreHorizontal, pencil: Pencil, play: Play, plus: Plus, undo: RotateCcw,
+  info: Info, loader: Loader2, logout: LogOut, lock: Lock, mail: Mail, pin: MapPin, menu: Menu, more: MoreHorizontal, pencil: Pencil, play: Play, plus: Plus, undo: RotateCcw,
   route: Route, search: Search, send: Send, shield: Shield, sparkles: Sparkles, ticket: TicketIcon, trash: Trash2, upload: Upload, user: User, users: Users,
   wifi: Wifi, wind: Wind, wrench: Wrench, x: X, zap: Zap,
 };

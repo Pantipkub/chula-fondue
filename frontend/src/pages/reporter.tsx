@@ -44,9 +44,9 @@ export function ReportForm() {
     <form className="page" onSubmit={submit}>
       <Link to={guest ? '/' : '/my'} className="crumb"><Icon name="back" size={16} />{guest ? 'กลับหน้าหลัก' : 'เรื่องของฉัน'}</Link>
       <PageHead title="แจ้งปัญหาใหม่" sub="กรอก 3 ขั้นตอนสั้น ๆ ใช้เวลาไม่ถึง 1 นาที" />
-      {guest && <div className="note tone-pink" style={{ alignItems: 'center', padding: '14px 18px' }}><Icon name="info" size={20} /><div className="grow"><div className="strong">คุณกำลังแจ้งแบบผู้เยี่ยมชม</div><div className="small">ต้องกรอกอีเมลติดต่อ · เก็บเลขที่เรื่องไว้เพื่อติดตามสถานะ · ติดตามได้จากเบราว์เซอร์และบัญชีผู้เยี่ยมชมเดิมเท่านั้น หากต้องการยืนยันผล ให้เข้าสู่ระบบก่อนแจ้งเรื่อง</div></div><Button kind="outline" sm type="button" onClick={() => nav('/login', { state: { from: '/report' } })}>เข้าสู่ระบบ</Button></div>}
+      {guest && <div className="note tone-pink note-action" style={{ alignItems: 'center', padding: '14px 18px' }}><Icon name="info" size={20} /><div className="grow"><div className="strong">คุณกำลังแจ้งแบบผู้เยี่ยมชม</div><div className="small">ต้องกรอกอีเมลติดต่อ · เก็บเลขที่เรื่องไว้เพื่อติดตามสถานะ · ติดตามได้จากเบราว์เซอร์และบัญชีผู้เยี่ยมชมเดิมเท่านั้น หากต้องการยืนยันผล ให้เข้าสู่ระบบก่อนแจ้งเรื่อง</div></div><Button kind="outline" sm type="button" onClick={() => nav('/login', { state: { from: '/report' } })}>เข้าสู่ระบบ</Button></div>}
       <div className="split">
-        <div className="card lg stack" style={{ ['--gap' as string]: '20px', padding: 32 }}>
+        <div className="card lg stack report-fields" style={{ ['--gap' as string]: '20px' }}>
           <Sec n="1" t="ปัญหาคืออะไร" d="เลือกหมวดที่ใกล้เคียงที่สุด" />
           <div className="cat-grid" role="radiogroup" aria-label="หมวดปัญหา">
             {CATEGORIES.map((x) => (
@@ -68,7 +68,7 @@ export function ReportForm() {
           <Sec n="3" t="แนบรูปถ่าย" d="ต้องมีอย่างน้อย 1 รูป สูงสุด 5 รูป" />
           <PhotoPicker files={photos} onChange={setPhotos} />
         </div>
-        <div className="stack" style={{ ['--gap' as string]: '20px', position: 'sticky', top: 96 }}>
+        <div className="stack report-summary" style={{ ['--gap' as string]: '20px' }}>
           <div className="card stack" style={{ ['--gap' as string]: '14px' }}>
             <h3>สรุปก่อนส่ง</h3>
             {[[c.icon, 'หมวด', c.label], ['pin', 'สถานที่', location || '—'], ['image', 'รูปถ่าย', `${photos.length} รูป`], ['user', 'ผู้แจ้ง', guest ? (email || 'ผู้เยี่ยมชม') : session!.email]].map(([i, a, b]) => (
@@ -97,12 +97,12 @@ export function ReportDone() {
   const toast = useToast();
   const guest = !session || session.role === 'GUEST';
   return (
-    <div className="page narrow" style={{ alignItems: 'center', paddingTop: 64 }}>
-      <div className="card lg stack center" style={{ width: 'min(560px, 100%)', padding: 40, borderRadius: 32, boxShadow: 'var(--shadow-lifted)', alignItems: 'center', ['--gap' as string]: '18px' }}>
+    <div className="page narrow report-done">
+      <div className="card lg stack center success-card" style={{ ['--gap' as string]: '18px' }}>
         <span className="bubble tone-sage" style={{ width: 112, height: 112 }}><span className="bubble" style={{ width: 76, height: 76, background: 'var(--sage-500)', color: '#fff' }}><Icon name="check" size={40} /></span></span>
         <h1>ส่งเรื่องเรียบร้อยแล้ว!</h1>
         <p className="muted">ระบบได้รับเรื่องของคุณแล้ว ผู้ดูแลจะตรวจสอบและส่งต่อให้หน่วยงานที่เกี่ยวข้อง</p>
-        <div className="row between" style={{ width: '100%', padding: '16px 20px', borderRadius: 18, background: 'var(--pink-50)', border: '1px solid var(--pink-200)', textAlign: 'left' }}>
+        <div className="row between ticket-id" style={{ width: '100%', padding: '16px 20px', borderRadius: 18, background: 'var(--pink-50)', border: '1px solid var(--pink-200)', textAlign: 'left' }}>
           <div className="grow"><div className="xs muted">เลขที่เรื่องของคุณ</div><div style={{ fontFamily: 'var(--head)', fontWeight: 700, fontSize: 28, color: 'var(--pink-800)' }}>{shortId(id)}</div><div className="xs muted" style={{ wordBreak: 'break-all' }}>{id}</div></div>
           <Button kind="secondary" sm icon="copy" onClick={() => navigator.clipboard?.writeText(id).then(() => toast('คัดลอกเลขที่เรื่องแล้ว'))}>คัดลอก</Button>
         </div>
@@ -212,7 +212,7 @@ export function TicketDetail() {
     <div className="page">
       <Crumb to="/my" label="เรื่องของฉัน" current={shortId(t.id)} />
       <div className="pagehead">
-        <div className="stack" style={{ ['--gap' as string]: '8px' }}><div className="row"><Badge status={t.status} /><span className="small muted strong">{shortId(t.id)}</span><span className="small muted">· {fmtDate(t.createdAt)}</span></div><h1>{t.description.length > 70 ? t.description.slice(0, 70) + '…' : t.description}</h1></div>
+        <div className="stack" style={{ ['--gap' as string]: '8px' }}><div className="row wrap"><Badge status={t.status} /><span className="small muted strong">{shortId(t.id)}</span><span className="small muted">· {fmtDate(t.createdAt)}</span></div><h1>{t.description.length > 70 ? t.description.slice(0, 70) + '…' : t.description}</h1></div>
         <div className="actions">
           {t.status === 'SUBMITTED' && <Button kind="outline" icon="x" onClick={() => setModal('cancel')}>ยกเลิกเรื่อง</Button>}
           {t.status === 'RESOLVED' && <><Button kind="outline" icon="undo" onClick={() => setModal('reopen')}>ขอให้แก้ไขใหม่</Button><Button kind="success" icon="check" busy={busy} onClick={() => act(() => Api.confirm(t.id), 'ยืนยันผลแล้ว ปิดเรื่องเรียบร้อย')}>ยืนยันว่าแก้ไขแล้ว</Button></>}

@@ -36,8 +36,8 @@ export function Inbox() {
       </div>
       <div className="row between wrap">
         <div className="tabs">{ATABS.map(([l, s], i) => <button key={l} className={`tab${tab === i ? ' on' : ''}`} onClick={() => setTab(i)}>{l}<span className="count">{s ? n(s) : tickets.length}</span></button>)}</div>
-        <div className="row"><div style={{ width: 220 }}><Input id="aq" icon="search" placeholder="ค้นหา" value={q} onChange={(e) => setQ(e.target.value)} aria-label="ค้นหา" /></div>
-          <div style={{ width: 220 }}><Select id="dept" icon="filter" value={dept} onChange={(e) => setDept(e.target.value)} aria-label="หน่วยงาน"><option value="">ทุกหน่วยงาน</option>{depts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</Select></div></div>
+        <div className="row inbox-filters"><div><Input id="aq" icon="search" placeholder="ค้นหา" value={q} onChange={(e) => setQ(e.target.value)} aria-label="ค้นหา" /></div>
+          <div><Select id="dept" icon="filter" value={dept} onChange={(e) => setDept(e.target.value)} aria-label="หน่วยงาน"><option value="">ทุกหน่วยงาน</option>{depts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</Select></div></div>
       </div>
       <ErrorBox error={load.error} />
       {load.loading && !load.data ? <Skeleton h={400} /> : rows.length === 0 ? <div className="card"><Empty title="ไม่มีเรื่องในหมวดนี้" icon="inbox">{tab === 1 && <span className="small">เรื่องใหม่ทั้งหมดถูกจัดการแล้ว</span>}</Empty></div> : (
@@ -90,8 +90,8 @@ export function Review() {
   return (
     <>
       <Crumb to="/admin" label="กล่องเรื่องเข้า" current={shortId(t.id)} />
-      <div className="stack" style={{ ['--gap' as string]: '8px' }}><div className="row"><Badge status={t.status} /><span className="small muted strong">{shortId(t.id)}</span><span className="small muted">· {fmtDate(t.createdAt)}</span></div><h1>{t.description.length > 70 ? t.description.slice(0, 70) + '…' : t.description}</h1></div>
-      <div className="split" style={{ gridTemplateColumns: 'minmax(0,1fr) 380px' }}>
+      <div className="stack" style={{ ['--gap' as string]: '8px' }}><div className="row wrap"><Badge status={t.status} /><span className="small muted strong">{shortId(t.id)}</span><span className="small muted">· {fmtDate(t.createdAt)}</span></div><h1>{t.description.length > 70 ? t.description.slice(0, 70) + '…' : t.description}</h1></div>
+      <div className="split review-split">
         <div className="stack" style={{ ['--gap' as string]: '24px' }}>
           <Gallery urls={t.photoUrls} />
           <div className="card lg stack"><h3>รายละเอียด</h3><p style={{ lineHeight: 1.65 }}>{t.description}</p><hr className="divider" />
@@ -236,7 +236,7 @@ export function Users() {
   return (
     <>
       <PageHead title="บัญชีเจ้าหน้าที่" sub="สร้างบัญชี Staff และ Admin · ผู้แจ้งสมัครเองได้ที่หน้าสมัครสมาชิก" />
-      <div className="split" style={{ gridTemplateColumns: 'minmax(0,1fr) 440px' }}>
+      <div className="split users-split">
         <div className="stack" style={{ ['--gap' as string]: '24px' }}>
           <form className="card lg stack" style={{ ['--gap' as string]: '18px' }} onSubmit={submit}>
             <h3>สร้างบัญชีใหม่</h3>

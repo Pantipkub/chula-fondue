@@ -16,9 +16,9 @@ export function Landing() {
         <div className="stack" style={{ ['--gap' as string]: '28px' }}>
           <span className="eyebrow"><Bubble icon="sparkles" tone="honey" size={26} iconSize={14} />ระบบแจ้งซ่อมอาคารของจุฬาฯ ในที่เดียว</span>
           <h1>เจอปัญหาในอาคาร?<br /><em>แจ้งเราได้ในไม่กี่คลิก</em></h1>
-          <p className="muted" style={{ fontSize: 18, lineHeight: 1.65, maxWidth: 560 }}>ถ่ายรูป ระบุตำแหน่ง แล้วกดส่ง ระบบจะส่งต่อให้หน่วยงานที่รับผิดชอบ และแสดงความคืบหน้าให้คุณเห็นทุกขั้นตอน — ไม่ต้องโทรตาม ไม่ต้องรอคิว</p>
-          <div className="row wrap"><Button icon="camera" onClick={() => nav('/report')}>แจ้งปัญหาตอนนี้</Button><Button kind="outline" icon="search" onClick={() => nav('/track')}>ติดตามด้วยเลขที่เรื่อง</Button></div>
-          <div className="row wrap" style={{ ['--gap' as string]: '28px' }}>
+          <p className="muted hero-description">ถ่ายรูป ระบุตำแหน่ง แล้วกดส่ง ระบบจะส่งต่อให้หน่วยงานที่รับผิดชอบ และแสดงความคืบหน้าให้คุณเห็นทุกขั้นตอน — ไม่ต้องโทรตาม ไม่ต้องรอคิว</p>
+          <div className="row wrap hero-actions"><Button icon="camera" onClick={() => nav('/report')}>แจ้งปัญหาตอนนี้</Button><Button kind="outline" icon="search" onClick={() => nav('/track')}>ติดตามด้วยเลขที่เรื่อง</Button></div>
+          <div className="row wrap hero-stats" style={{ ['--gap' as string]: '28px' }}>
             <div className="stat"><b>1–5 รูป</b><span>แนบหลักฐานได้ทันที</span></div><span className="vbar" />
             <div className="stat"><b>7 สถานะ</b><span>รู้ว่าเรื่องอยู่ขั้นไหน</span></div><span className="vbar" />
             <div className="stat"><b>ไม่ต้องสมัคร</b><span>แจ้งแบบผู้เยี่ยมชมได้</span></div>
@@ -59,7 +59,7 @@ export function Landing() {
           </div>
           <div className="card lg stack" style={{ ['--gap' as string]: '14px' }}>
             <h2>ทุกเรื่องมีสถานะชัดเจน</h2>
-            {(Object.keys(STATUS) as (keyof typeof STATUS)[]).map((s) => <div key={s} className="row"><span style={{ width: 150 }}><Badge status={s} /></span><span className="muted small grow">{STATUS[s].desc}</span></div>)}
+            {(Object.keys(STATUS) as (keyof typeof STATUS)[]).map((s) => <div key={s} className="row status-description"><span><Badge status={s} /></span><span className="muted small grow">{STATUS[s].desc}</span></div>)}
           </div>
         </div>
       </section>
@@ -67,7 +67,7 @@ export function Landing() {
         <div className="stack" style={{ ['--gap' as string]: '8px' }}><h1 style={{ color: '#fff' }}>พร้อมแจ้งปัญหาแล้วหรือยัง?</h1><p style={{ color: 'var(--pink-100)' }}>ใช้ได้ทั้งนิสิต บุคลากร และผู้เยี่ยมชม — บนมือถือหรือคอมพิวเตอร์</p></div>
         <div className="row wrap"><Button kind="outline" onClick={() => nav('/login')}>เข้าสู่ระบบ</Button><Button kind="secondary" icon="plus" onClick={() => nav('/report')}>แจ้งปัญหาเลย</Button></div>
       </div>
-      <footer className="row between wrap" style={{ padding: '28px 80px', background: '#fff', borderTop: '1px solid var(--line-200)' }}>
+      <footer className="row between wrap site-footer">
         <Logo /><span className="small muted">โครงงานวิชา Software Architecture · คณะวิศวกรรมศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย</span>
       </footer>
     </>
@@ -87,7 +87,7 @@ function AuthFrame({ title, sub, aside, children }: { title: string; sub: string
         </div>
         <div className="stack" style={{ ['--gap' as string]: '14px' }}><h1 style={{ fontSize: 40, color: 'var(--pink-800)', whiteSpace: 'pre-line' }}>{title}</h1><p>{sub}</p>{aside}</div>
       </div>
-      <div className="form">{children}</div>
+      <div className="form"><div className="auth-mobile-logo"><Logo /></div>{children}</div>
     </div>
   );
 }
@@ -162,9 +162,9 @@ export function TicketSummary({ ticket, history, children }: { ticket: Ticket; h
   const c = categoryOf(ticket.category);
   return (
     <div className="card lg stack" style={{ ['--gap' as string]: '20px' }}>
-      <div className="row wrap" style={{ ['--gap' as string]: '24px', alignItems: 'flex-start' }}>
-        <Photo src={ticket.photoUrls[0]} w={220} alt="รูปประกอบ" />
-        <div className="stack grow" style={{ ['--gap' as string]: '10px', minWidth: 260 }}>
+      <div className="row wrap ticket-summary" style={{ ['--gap' as string]: '24px', alignItems: 'flex-start' }}>
+        <Photo src={ticket.photoUrls[0]} className="summary-photo" alt="รูปประกอบ" />
+        <div className="stack grow summary-details" style={{ ['--gap' as string]: '10px' }}>
           <div className="row"><Badge status={ticket.status} /><span className="small muted strong">{shortId(ticket.id)}</span></div>
           <h2>{ticket.description.length > 60 ? ticket.description.slice(0, 60) + '…' : ticket.description}</h2>
           <div className="row wrap" style={{ ['--gap' as string]: '20px' }}>
@@ -201,7 +201,7 @@ export function Track() {
     <div className="page narrow">
       <div className="stack center" style={{ ['--gap' as string]: '8px', alignItems: 'center' }}><Bubble icon="search" size={56} iconSize={26} /><h1>ติดตามสถานะเรื่อง</h1><p className="muted">กรอกเลขที่เรื่องของคุณ ใช้บัญชีหรือเบราว์เซอร์เดิมที่แจ้งเรื่อง</p></div>
       <form className="card lg stack" style={{ ['--gap' as string]: '10px' }} onSubmit={submit}>
-        <div className="row" style={{ alignItems: 'flex-end' }}>
+        <div className="row track-search">
           <div className="grow"><Input id="tid" label="เลขที่เรื่อง (Ticket ID)" icon="ticket" value={q} onChange={(e) => setQ(e.target.value)} placeholder="เช่น 3f9a2c1e-7b4d-4c1a-9e2f-0a1b2c3d4e5f" /></div>
           <Button icon="search" type="submit">ค้นหา</Button>
         </div>
@@ -214,7 +214,7 @@ export function Track() {
         <TicketSummary ticket={load.data.ticket} history={load.data.history}>
           {session?.role === 'REPORTER' && session.email === load.data.ticket.reporterEmail
             ? <Button kind="outline" icon="eye" onClick={() => nav(`/tickets/${load.data!.ticket.id}`)}>เปิดในเรื่องของฉัน</Button>
-            : (!session || session.role === 'GUEST') && <div className="note tone-pink" style={{ alignItems: 'center' }}><Icon name="heart" /><span className="grow strong">เรื่องผู้เยี่ยมชมติดตามได้ด้วยเซสชันเดิม กรุณาเก็บเซสชันนี้ไว้ การสมัครสมาชิกใหม่ไม่โอนสิทธิ์เรื่องเดิม</span><Button sm onClick={() => nav('/register')}>สมัครสมาชิก</Button></div>}
+            : (!session || session.role === 'GUEST') && <div className="note tone-pink note-action" style={{ alignItems: 'center' }}><Icon name="heart" /><span className="grow strong">เรื่องผู้เยี่ยมชมติดตามได้ด้วยเซสชันเดิม กรุณาเก็บเซสชันนี้ไว้ การสมัครสมาชิกใหม่ไม่โอนสิทธิ์เรื่องเดิม</span><Button sm onClick={() => nav('/register')}>สมัครสมาชิก</Button></div>}
         </TicketSummary>
       )}
       {!param && recent.length > 0 && (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { Role } from '../lib/api';
@@ -7,32 +7,49 @@ import { Button, Icon, Logo } from './ui';
 
 const initials = (email: string) => (email ? email.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2) : '?');
 
+function useMobileMenu() {
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+  const toggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => { setOpen(false); }, [location.pathname, location.search]);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setOpen(false); toggle.current?.focus(); }
+    };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [open]);
+  return { open, setOpen, toggle };
+}
+
 /** Top navigation for visitors, guests and reporters. */
 export function TopNav() {
   const { session, logout } = useAuth();
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
+  const mobile = useMobileMenu();
   const role = session?.role;
   const links = role === 'REPORTER'
     ? [['/report', 'แจ้งปัญหา'], ['/my', 'เรื่องของฉัน'], ['/notifications', 'การแจ้งเตือน'], ['/track', 'ติดตามสถานะ']]
     : [['/', 'หน้าแรก'], ['/report', 'แจ้งปัญหา'], ['/track', 'ติดตามสถานะ']];
   return (
-    <header className="topnav">
+    <header className={`topnav${mobile.open ? ' menu-open' : ''}`}>
       <Logo to={role === 'REPORTER' ? '/my' : '/'} />
-      <nav className="navlinks hide-sm" aria-label="เมนูหลัก">
-        {links.map(([to, label]) => <NavLink key={to} to={to} end className={({ isActive }) => `navlink${isActive ? ' active' : ''}`}>{label}</NavLink>)}
-        {(role === 'ADMIN' || role === 'STAFF') && <NavLink to={homeFor(role)} className="navlink">ไปหน้าเจ้าหน้าที่</NavLink>}
+      <nav id="public-navigation" className="navlinks" aria-label="เมนูหลัก">
+        {links.map(([to, label]) => <NavLink key={to} to={to} end onClick={() => mobile.setOpen(false)} className={({ isActive }) => `navlink${isActive ? ' active' : ''}`}>{label}</NavLink>)}
+        {(role === 'ADMIN' || role === 'STAFF') && <NavLink to={homeFor(role)} onClick={() => mobile.setOpen(false)} className="navlink">ไปหน้าเจ้าหน้าที่</NavLink>}
       </nav>
-      <div className="row" style={{ ['--gap' as string]: '10px' }}>
+      <div className="row nav-actions" style={{ ['--gap' as string]: '10px' }}>
         {!session || role === 'GUEST' ? (
           <>
-            {role === 'GUEST' && <span className="rolechip tone-honey"><Icon name="user" size={14} />ผู้เยี่ยมชม</span>}
+            {role === 'GUEST' && <span className="rolechip tone-honey guest-chip"><Icon name="user" size={14} />ผู้เยี่ยมชม</span>}
             <Button kind="outline" sm onClick={() => nav('/login')}>เข้าสู่ระบบ</Button>
-            {!session && <Button sm icon="plus" onClick={() => nav('/report')}>แจ้งปัญหา</Button>}
+            {!session && <Button className="nav-report" sm icon="plus" onClick={() => nav('/report')}>แจ้งปัญหา</Button>}
           </>
         ) : (
           <div style={{ position: 'relative' }}>
-            <button className="userpill" onClick={() => setMenu((m) => !m)} aria-expanded={menu}>
+            <button className="userpill" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label={`บัญชี ${session.email}`}>
               <span className="avatar">{initials(session.email)}</span>
               <span className="who" style={{ textAlign: 'left' }}><span className="strong small" style={{ display: 'block' }}>{session.email}</span><span className="xs muted">{role === 'REPORTER' ? 'ผู้แจ้ง · Reporter' : role}</span></span>
               <Icon name="down" size={16} />
@@ -44,6 +61,7 @@ export function TopNav() {
             )}
           </div>
         )}
+        <button ref={mobile.toggle} className="icon-btn mobile-toggle" type="button" aria-label={mobile.open ? 'ปิดเมนูหลัก' : 'เปิดเมนูหลัก'} aria-expanded={mobile.open} aria-controls="public-navigation" onClick={() => mobile.setOpen((open) => !open)}><Icon name={mobile.open ? 'x' : 'menu'} size={22} /></button>
       </div>
     </header>
   );
@@ -71,18 +89,22 @@ const MENUS: Record<'ADMIN' | 'STAFF', [string, string, string][]> = {
 export function AppShell({ role, counts = {}, search }: { role: 'ADMIN' | 'STAFF'; counts?: Record<string, number>; search?: ReactNode }) {
   const { session, logout } = useAuth();
   const nav = useNavigate();
+  const mobile = useMobileMenu();
   return (
     <div className="shell">
-      <aside className="sidebar">
-        <div className="stack navgroup" style={{ ['--gap' as string]: '6px' }}>
-          <div style={{ padding: '0 8px 20px' }}><Logo to={role === 'ADMIN' ? '/admin' : '/staff'} /></div>
+      <aside className={`sidebar${mobile.open ? ' menu-open' : ''}`}>
+        <div className="sidebar-heading">
+          <Logo to={role === 'ADMIN' ? '/admin' : '/staff'} />
+          <button ref={mobile.toggle} className="icon-btn mobile-toggle" type="button" aria-label={mobile.open ? 'ปิดเมนูเจ้าหน้าที่' : 'เปิดเมนูเจ้าหน้าที่'} aria-expanded={mobile.open} aria-controls="workspace-navigation" onClick={() => mobile.setOpen((open) => !open)}><Icon name={mobile.open ? 'x' : 'menu'} size={22} /></button>
+        </div>
+        <nav id="workspace-navigation" className="stack navgroup" aria-label="เมนูเจ้าหน้าที่" style={{ ['--gap' as string]: '6px' }}>
           <div className="sec">{role === 'ADMIN' ? 'ผู้ดูแลระบบ' : 'เจ้าหน้าที่หน่วยงาน'}</div>
           {MENUS[role].map(([to, icon, label]) => (
-            <NavLink key={to} to={to} end={to === '/admin' || to === '/staff'} className={({ isActive }) => `navitem${isActive ? ' active' : ''}`}>
+            <NavLink key={to} to={to} end={to === '/admin' || to === '/staff'} onClick={() => mobile.setOpen(false)} className={({ isActive }) => `navitem${isActive ? ' active' : ''}`}>
               <Icon name={icon} size={20} />{label}{counts[to] ? <span className="count">{counts[to]}</span> : null}
             </NavLink>
           ))}
-        </div>
+        </nav>
         <div className="usercard">
           <span className="avatar" style={{ width: 36, height: 36 }}>{initials(session?.email ?? '')}</span>
           <div className="grow who"><div className="strong small" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{session?.email}</div><div className="xs muted">{role === 'ADMIN' ? 'Admin' : 'Staff'}</div></div>
@@ -91,8 +113,8 @@ export function AppShell({ role, counts = {}, search }: { role: 'ADMIN' | 'STAFF
       </aside>
       <div className="main">
         <div className="topbar">
-          <div className="search" style={{ width: 380 }}>{search}</div>
-          <div className="row">
+          <div className="search">{search}</div>
+          <div className="row topbar-links">
             <Link to="/notifications" className="small">การแจ้งเตือน</Link><Link to="/" className="small">ดูหน้าเว็บผู้แจ้ง</Link>
             <span className={`rolechip ${role === 'ADMIN' ? 'tone-pink' : 'tone-lilac'}`}><Icon name={role === 'ADMIN' ? 'shield' : 'wrench'} size={14} />{role === 'ADMIN' ? 'Admin' : 'Staff'}</span>
           </div>
@@ -114,5 +136,5 @@ export const PageHead = ({ title, sub, eyebrow, children }: { title: string; sub
   </div>
 );
 export const Crumb = ({ to, label, current }: { to: string; label: string; current: string }) => (
-  <div className="row small" style={{ ['--gap' as string]: '8px' }}><Link to={to} className="crumb"><Icon name="back" size={16} />{label}</Link><span style={{ color: 'var(--ink-400)' }}>/</span><span className="muted strong">{current}</span></div>
+  <div className="row wrap small" style={{ ['--gap' as string]: '8px' }}><Link to={to} className="crumb"><Icon name="back" size={16} />{label}</Link><span style={{ color: 'var(--ink-400)' }}>/</span><span className="muted strong">{current}</span></div>
 );
