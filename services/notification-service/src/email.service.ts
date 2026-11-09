@@ -1,16 +1,13 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { NotificationStore } from './notification-store.js';
 
-export interface EmailEvent { eventId: string; ticketId: string; recipientEmail: string; status: string; description: string; }
+import { mimeMessage } from './email-template.js';
+import type { EmailEvent } from './email-template.js';
+
+export type { EmailEvent } from './email-template.js';
+/** The Gmail `raw` field: a multipart (plain text + HTML) message, base64url. */
 export function rawMessage(event: EmailEvent, from: string) {
-  if ([from, event.recipientEmail].some(value => /[\r\n]/.test(value))) throw new Error('Invalid email header');
-  const subject = Buffer.from(`Chula Fondue: ${event.status} (${event.ticketId.slice(0, 8)})`).toString('base64');
-  const body = Buffer.from(`Ticket: ${event.ticketId}\nStatus: ${event.status}\n\n${event.description}\n\nOpen Chula Fondue to track your report.`).toString('base64');
-  return Buffer.from([
-    `From: ${from}`, `To: ${event.recipientEmail}`, `Subject: =?UTF-8?B?${subject}?=`,
-    `Message-ID: <${event.eventId}@chula-fondue.local>`, 'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', body,
-  ].join('\r\n')).toString('base64url');
+  return mimeMessage(event, from);
 }
 
 export class GmailClient {
