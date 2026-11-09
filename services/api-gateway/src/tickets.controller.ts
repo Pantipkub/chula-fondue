@@ -39,8 +39,6 @@ const HTTP_STATUS_BY_GRPC_CODE: Record<number, number> = {
 /** How long one call to Ticket Service may take, including finding and connecting to it. */
 const GRPC_TIMEOUT_MS = Number(process.env.GRPC_TIMEOUT_MS ?? 5000);
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 // Decides who may call what, stores uploaded photos, then forwards to one TicketService RPC.
 // Ticket rules (statuses, required fields) stay in Ticket Service.
 @Controller('tickets')
@@ -53,20 +51,17 @@ export class TicketsController implements OnModuleInit {
     this.ticketService = this.client.getService('TicketService');
   }
 
-  // multipart/form-data: category, location, description, photos (1-5 files), contactEmail (guests only)
+  // multipart/form-data: category, location, description, photos (1-5 files)
+  // Reporters only: a guest ticket is bound to one anonymous token and becomes untrackable once that token is lost.
   @Post()
-  @Roles('REPORTER', 'GUEST')
+  @Roles('REPORTER')
   @UseInterceptors(PhotosInterceptor)
   async create(
     @CurrentUser() user: AuthUser,
     @Body() body: Record<string, string> = {},
     @UploadedFiles() photos?: UploadedPhoto[],
   ) {
-    // A logged-in reporter is identified by the token; a guest has no account and must leave an address.
-    const reporterEmail = user.role === 'GUEST' && typeof body.contactEmail === 'string' ? body.contactEmail.trim().toLowerCase() : user.role === 'GUEST' ? '' : user.email;
-    if (!reporterEmail || !EMAIL.test(reporterEmail)) {
-      throw new BadRequestException('contactEmail must be a valid email address for guest reporters');
-    }
+    const reporterEmail = user.email;
     for (const field of ['category', 'location', 'description']) {
       if (typeof body[field] !== 'string' || !body[field].trim() || body[field].length > 5000) throw new BadRequestException(`${field} is required and must be at most 5000 characters`);
     }

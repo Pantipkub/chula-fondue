@@ -11,14 +11,15 @@ import { Crumb, PageHead } from '../components/layouts';
 
 // ---------------------------------------------------------------- report form (Reporter or Guest)
 export function ReportForm() {
-  const { session, ensureToken } = useAuth();
+  const { session } = useAuth();
   const nav = useNavigate();
+  // Guest tickets are bound to one anonymous token and lost with it, so only signed-in reporters may submit.
   const guest = !session || session.role === 'GUEST';
+  const [needLogin, setNeedLogin] = useState(false);
   const [category, setCategory] = useState<string>(CATEGORIES[0].value);
   const [description, setDescription] = useState('');
   const [building, setBuilding] = useState('');
   const [spot, setSpot] = useState('');
-  const [email, setEmail] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -26,14 +27,13 @@ export function ReportForm() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (guest) return setNeedLogin(true); // Enter key path
     if (!photos.length) return setErr('ต้องแนบรูปอย่างน้อย 1 รูป');
     if (!location) return setErr('กรุณาระบุสถานที่');
     setBusy(true); setErr('');
     try {
-      const s = await ensureToken();
       const f = new FormData();
       f.append('category', category); f.append('location', location); f.append('description', description.trim());
-      if (s.role === 'GUEST') f.append('contactEmail', email.trim());
       photos.forEach((p) => f.append('photos', p));
       const t = await Api.createTicket(f);
       recentTickets.add(t.id);
@@ -45,7 +45,7 @@ export function ReportForm() {
     <form className="page" onSubmit={submit}>
       <Link to={guest ? '/' : '/my'} className="crumb"><Icon name="back" size={16} />{guest ? 'กลับหน้าหลัก' : 'เรื่องของฉัน'}</Link>
       <PageHead title="แจ้งปัญหาใหม่" sub="กรอก 3 ขั้นตอนสั้น ๆ ใช้เวลาไม่ถึง 1 นาที" />
-      {guest && <div className="note tone-pink note-action" style={{ alignItems: 'center', padding: '14px 18px' }}><Icon name="info" size={20} /><div className="grow"><div className="strong">คุณกำลังแจ้งแบบผู้เยี่ยมชม</div><div className="small">ต้องกรอกอีเมลติดต่อ · เก็บเลขที่เรื่องไว้เพื่อติดตามสถานะ · ติดตามได้จากเบราว์เซอร์และบัญชีผู้เยี่ยมชมเดิมเท่านั้น หากต้องการยืนยันผล ให้เข้าสู่ระบบก่อนแจ้งเรื่อง</div></div><Button kind="outline" sm type="button" onClick={() => nav('/login', { state: { from: '/report' } })}>เข้าสู่ระบบ</Button></div>}
+      {guest && <div className="note tone-pink note-action" style={{ alignItems: 'center', padding: '14px 18px' }}><Icon name="info" size={20} /><div className="grow"><div className="strong">ต้องเข้าสู่ระบบก่อนส่งเรื่อง</div><div className="small">เรื่องที่แจ้งจะผูกกับบัญชีของคุณ จึงติดตามสถานะ ยืนยันผล หรือขอแก้ไขใหม่ได้จากทุกเครื่อง</div></div><Button kind="outline" sm type="button" onClick={() => nav('/login', { state: { from: '/report' } })}>เข้าสู่ระบบ</Button></div>}
       <div className="split">
         <div className="card lg stack report-fields" style={{ ['--gap' as string]: '20px' }}>
           <Sec n="1" t="ปัญหาคืออะไร" d="เลือกหมวดที่ใกล้เคียงที่สุด" />
@@ -64,7 +64,6 @@ export function ReportForm() {
             <Input id="spot" label="ชั้น / ห้อง / จุดสังเกต" icon="pin" value={spot} onChange={(e) => setSpot(e.target.value)} placeholder="เช่น ชั้น 4 ห้อง 401" />
             <datalist id="buildings">{BUILDINGS.map((b) => <option key={b} value={b} />)}</datalist>
           </div>
-          {guest && <Input id="email" label="อีเมลติดต่อ" required type="email" icon="mail" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" help="จำเป็นสำหรับผู้เยี่ยมชม · ใช้ระบุผู้แจ้งและติดต่อกลับเกี่ยวกับเรื่องนี้" />}
           <hr className="divider" />
           <Sec n="3" t="แนบรูปถ่าย" d="ต้องมีอย่างน้อย 1 รูป สูงสุด 5 รูป" />
           <PhotoPicker files={photos} onChange={setPhotos} />
@@ -72,12 +71,13 @@ export function ReportForm() {
         <div className="stack report-summary" style={{ ['--gap' as string]: '20px' }}>
           <div className="card stack" style={{ ['--gap' as string]: '14px' }}>
             <h3>สรุปก่อนส่ง</h3>
-            {[[c.icon, 'หมวด', c.label], ['pin', 'สถานที่', location || '—'], ['image', 'รูปถ่าย', `${photos.length} รูป`], ['user', 'ผู้แจ้ง', guest ? (email || 'ผู้เยี่ยมชม') : session!.email]].map(([i, a, b]) => (
+            {[[c.icon, 'หมวด', c.label], ['pin', 'สถานที่', location || '—'], ['image', 'รูปถ่าย', `${photos.length} รูป`], ['user', 'ผู้แจ้ง', guest ? 'ยังไม่ได้เข้าสู่ระบบ' : session!.email]].map(([i, a, b]) => (
               <div key={a} className="row"><Bubble icon={i} size={32} iconSize={16} tone="pink" /><div className="grow"><div className="xs muted">{a}</div><div className="small strong" style={{ wordBreak: 'break-word' }}>{b}</div></div></div>
             ))}
             <hr className="divider" />
             <ErrorBox error={err} />
-            <Button icon="send" block busy={busy} type="submit">ส่งเรื่อง</Button>
+            {/* onClick runs before the browser's required-field check, so guests see the login prompt even on an empty form. */}
+            <Button icon="send" block busy={busy} type="submit" onClick={(e) => { if (guest) { e.preventDefault(); setNeedLogin(true); } }}>ส่งเรื่อง</Button>
           </div>
           <div className="note tone-honey stack" style={{ display: 'flex', flexDirection: 'column', padding: 20, borderRadius: 20, ['--gap' as string]: '10px' }}>
             <span className="row strong" style={{ ['--gap' as string]: '8px' }}><Icon name="sparkles" />เคล็ดลับให้เรื่องถึงเร็ว</span>
@@ -85,6 +85,11 @@ export function ReportForm() {
           </div>
         </div>
       </div>
+      <Modal open={needLogin} onClose={() => setNeedLogin(false)} label="ต้องเข้าสู่ระบบ">
+        <Bubble icon="lock" tone="pink" size={56} iconSize={26} />
+        <div className="stack" style={{ ['--gap' as string]: '6px' }}><h2>เข้าสู่ระบบก่อนส่งเรื่อง</h2><p className="small muted">เรื่องที่แจ้งจะผูกกับบัญชีของคุณ จึงติดตามสถานะและยืนยันผลได้จากทุกเครื่อง</p></div>
+        <div className="two"><Button kind="outline" type="button" onClick={() => nav('/register')}>สมัครสมาชิก</Button><Button type="button" onClick={() => nav('/login', { state: { from: '/report' } })}>เข้าสู่ระบบ</Button></div>
+      </Modal>
     </form>
   );
 }

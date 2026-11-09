@@ -77,17 +77,11 @@ async function main() {
   const hidden = await call('/tickets?reporterEmail=forged@example.test', { token: other });
   assert.ok(!hidden.tickets.some(t => t.id === id));
   const guest = (await call('/auth/guest', { method: 'POST', expected: 200 })).accessToken;
-  const guest2 = (await call('/auth/guest', { method: 'POST', expected: 200 })).accessToken;
   await call(`/tickets/${id}/history`, { token: guest, expected: 403 });
-  const guestTicket = await call('/tickets', { token: guest, method: 'POST', form: photoForm({ ...fields, contactEmail: `guest-${run}@example.test` }), expected: 201 });
-  await call(`/tickets/${guestTicket.id}/history`, { token: guest });
-  await call(`/tickets/${guestTicket.id}/history`, { token: guest2, expected: 403 });
-  const impostorEmail = `guest-${run}@example.test`;
-  await call('/auth/register', { method: 'POST', json: { email: impostorEmail, password }, expected: 201 });
-  const impostor = (await call('/auth/login', { method: 'POST', json: { email: impostorEmail, password } })).accessToken;
-  await call(`/tickets/${guestTicket.id}/history`, { token: impostor, expected: 403 });
+  // Guests must sign in before reporting: their anonymous token cannot be recovered to track the ticket later.
+  await call('/tickets', { token: guest, method: 'POST', form: photoForm(fields), expected: 403 });
   await call('/tickets', { token: guest, expected: 403 });
-  await call(`/tickets/${guestTicket.id}`, { token: guest, method: 'DELETE', expected: 403 });
+  await call(`/tickets/${id}`, { token: guest, method: 'DELETE', expected: 403 });
   const cancel = await call('/tickets', { token: reporter, method: 'POST', form: photoForm(fields), expected: 201 });
   await call(`/tickets/${cancel.id}`, { token: reporter, method: 'DELETE' });
   const reject = await call('/tickets', { token: reporter, method: 'POST', form: photoForm(fields), expected: 201 });

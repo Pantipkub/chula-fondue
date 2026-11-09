@@ -15,9 +15,9 @@ Use `Authorization: Bearer <accessToken>`. Local demo base: `http://localhost:31
 | GET/POST /routing-rules | Admin | List / `{category,departmentId,enabled?}`; one enabled rule per canonical category |
 | PUT /routing-rules/:id | Admin | Update category, department or enabled; no null values |
 | POST /routing-rules/match | Admin | `{category}` → MATCHED with rule/department snapshot, NO_RULE or AMBIGUOUS_RULES |
-| POST /tickets | Reporter/Guest | Multipart: category, location, description, photos; Guest contactEmail |
+| POST /tickets | Reporter | Multipart: category, location, description, photos; guests get 403 and must sign in |
 | GET /tickets | Reporter/Staff/Admin | Scoped list; status, departmentId, reporterEmail, includeCancelled filters |
-| GET /tickets/:id/history | Authorized owner/Staff/Admin | Ticket and ordered timeline; Guest requires original subject |
+| GET /tickets/:id/history | Authorized owner/Staff/Admin | Ticket and ordered timeline; older guest tickets require the original guest subject |
 | DELETE /tickets/:id | Reporter owner | Cancel Submitted/Assigned before staff starts; notify assigned department |
 | POST /tickets/:id/category | Admin | `{category}` while Submitted/Assigned |
 | POST /tickets/:id/assign | Admin | `{departmentId}` while Submitted/Assigned |
