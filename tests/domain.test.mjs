@@ -32,6 +32,24 @@ test('email encoding handles Thai and refuses header injection', () => {
   assert.match(raw, /Message-ID: <event-1@chula-fondue.local>/);
   assert.throws(() => rawMessage({ ...event, recipientEmail: 'x@example.com\r\nBcc: y@example.com' }, 'sender@example.com'));
 });
+test('HTML email escapes user text, and offers a plain-text part', () => {
+  const base = { eventId: 'event-2', ticketId: 'abcd1234-0000-4000-8000-000000000000', reporterEmail: 'reporter@example.com', reporterId: 'guest-1',
+    category: 'Plumbing', location: 'Library', departmentName: 'Facilities', description: '<img src=x onerror=alert(1)>', changedAt: '2026-11-10T03:00:00Z' };
+  // Returns the decoded HTML part of the MIME message.
+  const decode = (raw) => {
+    const message = Buffer.from(raw, 'base64url').toString();
+    const html = message.split('Content-Type: text/html; charset=UTF-8')[1].split('\r\n\r\n')[1].split('\r\n--')[0];
+    return Buffer.from(html.replace(/\r\n/g, ''), 'base64').toString();
+  };
+  const raw = Buffer.from(rawMessage({ ...base, status: 'ASSIGNED', recipientEmail: 'facilities@example.com' }, 'sender@example.com'), 'base64url').toString();
+  assert.match(raw, /multipart\/alternative/);
+  assert.match(raw, /Content-Type: text\/html; charset=UTF-8/);
+  const department = decode(rawMessage({ ...base, status: 'ASSIGNED', recipientEmail: 'facilities@example.com' }, 'sender@example.com'));
+  assert.ok(!department.includes('<img src=x'), 'description must be escaped');
+  assert.match(department, /มีเรื่องแจ้งซ่อมส่งถึงหน่วยงานของคุณ/);
+  const guest = decode(rawMessage({ ...base, status: 'REJECTED', reason: 'duplicate', recipientEmail: 'reporter@example.com' }, 'sender@example.com'));
+  assert.match(guest, /duplicate/);
+});
 test('Gmail integration refreshes OAuth once and sends base64url MIME', async () => {
   Object.assign(process.env, { GMAIL_CLIENT_ID: 'test', GMAIL_CLIENT_SECRET: 'test', GMAIL_REFRESH_TOKEN: 'test', GMAIL_FROM: 'sender@example.com' });
   const calls = [];
