@@ -7,7 +7,7 @@ const DEPARTMENT_SERVICE_URL = process.env.DEPARTMENT_SERVICE_URL ?? 'http://loc
 
 @Controller()
 export class DepartmentsController {
-  @All(['departments', 'departments/:id'])
+  @All(['departments', 'departments/:id', 'routing-rules', 'routing-rules/:id'])
   @Roles('ADMIN')
   proxy(@Req() req: Request, @Res() res: Response) {
     return proxyRest('Department Service', DEPARTMENT_SERVICE_URL, req, res);

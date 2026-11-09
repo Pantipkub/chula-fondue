@@ -4,7 +4,8 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Api } from '../lib/api';
 import type { Status, Ticket } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { BUILDINGS, CATEGORIES, ago, categoryOf, fmtDate, recentTickets, shortId } from '../lib/format';
+import { BUILDINGS, CATEGORIES, ago, categoryOf, fmtDate, isRoutingPending, recentTickets, shortId } from '../lib/format';
+import { RoutingNotice } from '../components/routing';
 import { Badge, Bubble, Button, Empty, ErrorBox, Gallery, Icon, Input, Meta, Modal, Note, Photo, PhotoPicker, Skeleton, Textarea, Timeline, VSteps, useLoad, useToast } from '../components/ui';
 import { Crumb, PageHead } from '../components/layouts';
 
@@ -96,12 +97,15 @@ export function ReportDone() {
   const nav = useNavigate();
   const toast = useToast();
   const guest = !session || session.role === 'GUEST';
+  const load = useLoad(() => Api.history(id), [id], (result) => isRoutingPending(result.ticket));
   return (
     <div className="page narrow report-done">
       <div className="card lg stack center success-card" style={{ ['--gap' as string]: '18px' }}>
         <span className="bubble tone-sage" style={{ width: 112, height: 112 }}><span className="bubble" style={{ width: 76, height: 76, background: 'var(--sage-500)', color: '#fff' }}><Icon name="check" size={40} /></span></span>
         <h1>ส่งเรื่องเรียบร้อยแล้ว!</h1>
-        <p className="muted">ระบบได้รับเรื่องของคุณแล้ว ผู้ดูแลจะตรวจสอบและส่งต่อให้หน่วยงานที่เกี่ยวข้อง</p>
+        <p className="muted">ระบบได้รับเรื่องของคุณแล้ว ติดตามหน่วยงานที่รับผิดชอบและความคืบหน้าได้จากเลขที่เรื่องนี้</p>
+        {load.data && <RoutingNotice ticket={load.data.ticket} />}
+        <ErrorBox error={load.error} />
         <div className="row between ticket-id" style={{ width: '100%', padding: '16px 20px', borderRadius: 18, background: 'var(--pink-50)', border: '1px solid var(--pink-200)', textAlign: 'left' }}>
           <div className="grow"><div className="xs muted">เลขที่เรื่องของคุณ</div><div style={{ fontFamily: 'var(--head)', fontWeight: 700, fontSize: 28, color: 'var(--pink-800)' }}>{shortId(id)}</div><div className="xs muted" style={{ wordBreak: 'break-all' }}>{id}</div></div>
           <Button kind="secondary" sm icon="copy" onClick={() => navigator.clipboard?.writeText(id).then(() => toast('คัดลอกเลขที่เรื่องแล้ว'))}>คัดลอก</Button>
@@ -109,7 +113,7 @@ export function ReportDone() {
         {guest && <Note tone="honey">ผู้เยี่ยมชมไม่มีหน้ารายการเรื่อง เก็บเลขเต็มด้านบนหรือบุ๊กมาร์กหน้าติดตามไว้ เครื่องนี้จะจำเรื่องที่แจ้งไว้ให้ด้วย</Note>}
         <div className="stack" style={{ width: '100%', textAlign: 'left', ['--gap' as string]: '10px' }}>
           <span className="strong small" style={{ color: 'var(--pink-800)' }}>ขั้นตอนต่อไป</span>
-          {['ผู้ดูแลตรวจสอบและมอบหมายหน่วยงาน', 'เจ้าหน้าที่เริ่มดำเนินการ — สถานะในไทม์ไลน์จะเปลี่ยนตาม', 'เมื่อแก้ไขเสร็จ กดยืนยันผล หรือขอให้แก้ไขใหม่'].map((t, i) => <span key={t} className="row small"><span className="count" style={{ minWidth: 26, height: 26, background: 'var(--pink-100)', color: 'var(--pink-800)' }}>{i + 1}</span>{t}</span>)}
+          {['ส่งต่อให้หน่วยงานตามกฎ หรือให้ผู้ดูแลตรวจสอบกรณีที่ต้องเลือกหน่วยงาน', 'เจ้าหน้าที่เริ่มดำเนินการ — สถานะในไทม์ไลน์จะเปลี่ยนตาม', 'เมื่อแก้ไขเสร็จ กดยืนยันผล หรือขอให้แก้ไขใหม่'].map((t, i) => <span key={t} className="row small"><span className="count" style={{ minWidth: 26, height: 26, background: 'var(--pink-100)', color: 'var(--pink-800)' }}>{i + 1}</span>{t}</span>)}
         </div>
         <div className="two" style={{ width: '100%' }}>
           <Button kind="outline" icon="plus" onClick={() => nav('/report')}>แจ้งเรื่องอื่น</Button>
@@ -127,7 +131,7 @@ export function MyTickets() {
   const { session } = useAuth();
   const nav = useNavigate();
   const toast = useToast();
-  const load = useLoad(() => Api.listTickets({ includeCancelled: 'true' }));
+  const load = useLoad(() => Api.listTickets({ includeCancelled: 'true' }), [], (tickets) => tickets.some(isRoutingPending));
   const [tab, setTab] = useState(0);
   const [q, setQ] = useState('');
   const [busyId, setBusyId] = useState('');
@@ -194,7 +198,7 @@ export function TicketDetail() {
   const { id = '' } = useParams();
   const [sp, setSp] = useSearchParams();
   const toast = useToast();
-  const load = useLoad(() => Api.history(id), [id]);
+  const load = useLoad(() => Api.history(id), [id], (result) => isRoutingPending(result.ticket));
   const [modal, setModal] = useState<'cancel' | 'reopen' | null>(sp.get('reopen') ? 'reopen' : null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -211,10 +215,11 @@ export function TicketDetail() {
   return (
     <div className="page">
       <Crumb to="/my" label="เรื่องของฉัน" current={shortId(t.id)} />
+      <RoutingNotice ticket={t} />
       <div className="pagehead">
         <div className="stack" style={{ ['--gap' as string]: '8px' }}><div className="row wrap"><Badge status={t.status} /><span className="small muted strong">{shortId(t.id)}</span><span className="small muted">· {fmtDate(t.createdAt)}</span></div><h1>{t.description.length > 70 ? t.description.slice(0, 70) + '…' : t.description}</h1></div>
         <div className="actions">
-          {t.status === 'SUBMITTED' && <Button kind="outline" icon="x" onClick={() => setModal('cancel')}>ยกเลิกเรื่อง</Button>}
+          {['SUBMITTED', 'ASSIGNED'].includes(t.status) && <Button kind="outline" icon="x" onClick={() => setModal('cancel')}>ยกเลิกเรื่อง</Button>}
           {t.status === 'RESOLVED' && <><Button kind="outline" icon="undo" onClick={() => setModal('reopen')}>ขอให้แก้ไขใหม่</Button><Button kind="success" icon="check" busy={busy} onClick={() => act(() => Api.confirm(t.id), 'ยืนยันผลแล้ว ปิดเรื่องเรียบร้อย')}>ยืนยันว่าแก้ไขแล้ว</Button></>}
         </div>
       </div>
@@ -223,7 +228,7 @@ export function TicketDetail() {
           <Gallery urls={t.photoUrls} />
           <div className="card lg stack">
             <h3>รายละเอียด</h3><p style={{ lineHeight: 1.65 }}>{t.description}</p><hr className="divider" />
-            <div className="two"><KV icon={c.icon} k="หมวด" v={c.label} /><KV icon="pin" k="สถานที่" v={t.location} /><KV icon="calendar" k="แจ้งเมื่อ" v={fmtDate(t.createdAt)} /><KV icon="building" k="หน่วยงานที่รับผิดชอบ" v={t.departmentName || 'รอผู้ดูแลมอบหมาย'} /></div>
+            <div className="two"><KV icon={c.icon} k="หมวด" v={c.label} /><KV icon="pin" k="สถานที่" v={t.location} /><KV icon="calendar" k="แจ้งเมื่อ" v={fmtDate(t.createdAt)} /><KV icon="building" k="หน่วยงานที่รับผิดชอบ" v={t.departmentName || 'รอส่งต่อหน่วยงาน'} /></div>
           </div>
           {t.completionPhotoUrls.length > 0 && (
             <div className="card lg stack" style={{ background: 'var(--sage-100)', borderColor: 'var(--sage-300)' }}>
@@ -234,7 +239,7 @@ export function TicketDetail() {
         </div>
         <div className="stack" style={{ ['--gap' as string]: '24px' }}>
           <div className="card lg stack"><div className="row between"><h3>สถานะ</h3><Badge status={t.status} /></div><VSteps status={t.status} />
-            {t.status === 'SUBMITTED' && <Note>ยกเลิกได้เฉพาะตอนที่ยังไม่ถูกมอบหมายหน่วยงาน</Note>}
+            {['SUBMITTED', 'ASSIGNED'].includes(t.status) && <Note>ยกเลิกได้ก่อนเจ้าหน้าที่เริ่มดำเนินการ</Note>}
             {t.status === 'RESOLVED' && <Note>ตรวจดูหน้างานแล้วกดยืนยัน หรือขอให้แก้ไขใหม่พร้อมเหตุผล</Note>}
             {t.status === 'REJECTED' && t.reason && <Note tone="red" icon="x">เหตุผล: {t.reason}</Note>}
           </div>

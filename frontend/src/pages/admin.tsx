@@ -3,14 +3,16 @@ import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Api } from '../lib/api';
 import type { Department, Status } from '../lib/api';
-import { ago, categoryOf, fmtDate, shortId, suggestDepartment } from '../lib/format';
+import { ago, categoryOf, fmtDate, isRoutingPending, shortId } from '../lib/format';
+import { RoutingNotice } from '../components/routing';
+import { RoutingRules } from '../components/routing-rules';
 import { Badge, Bubble, Button, Drawer, Empty, ErrorBox, Gallery, Icon, Input, Meta, Modal, Note, Photo, Select, Skeleton, Textarea, Timeline, VSteps, useLoad, useToast } from '../components/ui';
 import { AppShell, Crumb, PageHead } from '../components/layouts';
 import { KV, Kpi } from './reporter';
 
 export function AdminFrame() {
   const loc = useLocation();
-  const load = useLoad(() => Api.listTickets({ status: 'SUBMITTED' }), [loc.pathname]);
+  const load = useLoad(() => Api.listTickets({ status: 'SUBMITTED' }), [loc.pathname], (tickets) => tickets.some(isRoutingPending));
   return <AppShell role="ADMIN" counts={{ '/admin': load.data?.length ?? 0 }} />;
 }
 
@@ -18,22 +20,25 @@ export function AdminFrame() {
 const ATABS: [string, Status[] | null][] = [['ทั้งหมด', null], ['รอตรวจสอบ', ['SUBMITTED']], ['มอบหมายแล้ว', ['ASSIGNED']], ['กำลังดำเนินการ', ['IN_PROGRESS']], ['รอยืนยัน', ['RESOLVED']], ['ปิดแล้ว', ['CLOSED']], ['ปฏิเสธ/ยกเลิก', ['REJECTED', 'CANCELLED']]];
 export function Inbox() {
   const nav = useNavigate();
-  const load = useLoad(() => Promise.all([Api.listTickets({ includeCancelled: 'true' }), Api.departments()]));
+  const load = useLoad(() => Promise.all([Api.listTickets({ includeCancelled: 'true' }), Api.departments()]), [], ([tickets]) => tickets.some(isRoutingPending));
   const [tab, setTab] = useState(1);
   const [dept, setDept] = useState('');
   const [q, setQ] = useState('');
   const [tickets, depts] = load.data ?? [[], []];
   const n = (s: Status[]) => tickets.filter((t) => s.includes(t.status)).length;
+  const pending = tickets.filter(isRoutingPending).length;
+  const review = tickets.filter((t) => t.status === 'SUBMITTED' && !isRoutingPending(t)).length;
   const rows = useMemo(() => tickets.filter((t) => (!ATABS[tab][1] || ATABS[tab][1]!.includes(t.status)) && (!dept || t.departmentId === dept) && (!q || `${t.id} ${t.location} ${t.description} ${t.reporterEmail}`.toLowerCase().includes(q.toLowerCase()))), [tickets, tab, dept, q]);
   return (
     <>
-      <PageHead title="กล่องเรื่องเข้า" sub="ตรวจสอบเรื่องใหม่ มอบหมายหน่วยงาน หรือปฏิเสธพร้อมเหตุผล"><Button kind="outline" icon="undo" onClick={load.reload} busy={load.loading}>รีเฟรช</Button></PageHead>
+      <PageHead title="กล่องเรื่องเข้า" sub="ติดตามการส่งต่ออัตโนมัติ และตรวจสอบเรื่องที่ต้องให้ผู้ดูแลจัดการ"><Button kind="outline" icon="undo" onClick={load.reload} busy={load.loading}>รีเฟรช</Button></PageHead>
       <div className="kpis">
-        <Kpi icon="inbox" tone="honey" n={n(['SUBMITTED'])} label="รอตรวจสอบ" hl={n(['SUBMITTED']) > 0} />
+        <Kpi icon="inbox" tone="honey" n={review} label="ต้องตรวจสอบ" hl={review > 0} />
         <Kpi icon="route" tone="pink" n={n(['ASSIGNED'])} label="มอบหมายแล้ว" />
         <Kpi icon="wrench" tone="lilac" n={n(['IN_PROGRESS'])} label="กำลังดำเนินการ" />
         <Kpi icon="check" tone="sage" n={n(['RESOLVED'])} label="รอผู้แจ้งยืนยัน" />
       </div>
+      {pending > 0 && <Note icon="route">กำลังส่งต่ออัตโนมัติ {pending} เรื่อง · ต้องให้ผู้ดูแลตรวจสอบ {review} เรื่อง</Note>}
       <div className="row between wrap">
         <div className="tabs">{ATABS.map(([l, s], i) => <button key={l} className={`tab${tab === i ? ' on' : ''}`} onClick={() => setTab(i)}>{l}<span className="count">{s ? n(s) : tickets.length}</span></button>)}</div>
         <div className="row inbox-filters"><div><Input id="aq" icon="search" placeholder="ค้นหา" value={q} onChange={(e) => setQ(e.target.value)} aria-label="ค้นหา" /></div>
@@ -51,7 +56,7 @@ export function Inbox() {
                   <td><div className="row"><Photo src={t.photoUrls[0]} tone={i} className="thumb" /><div style={{ minWidth: 0, maxWidth: 260 }}><div className="strong" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</div><div className="xs muted">{shortId(t.id)} · {c.label}</div></div></div></td>
                   <td style={{ maxWidth: 200 }}>{t.location}</td>
                   <td>{t.reporterEmail}</td>
-                  <td className={t.departmentName ? '' : 'muted'}>{t.departmentName || '—'}</td>
+                  <td className={t.departmentName ? '' : 'muted'}>{t.departmentName || (isRoutingPending(t) ? 'กำลังส่งต่ออัตโนมัติ' : 'รอผู้ดูแลเลือก')}</td>
                   <td><Badge status={t.status} /></td>
                   <td className="muted" style={{ whiteSpace: 'nowrap' }}>{ago(t.createdAt)}</td>
                   <td><Icon name="right" /></td>
@@ -69,7 +74,7 @@ export function Inbox() {
 export function Review() {
   const { id = '' } = useParams();
   const toast = useToast();
-  const load = useLoad(() => Promise.all([Api.history(id), Api.departments()]), [id]);
+  const load = useLoad(() => Promise.all([Api.history(id), Api.departments()]), [id], ([result]) => isRoutingPending(result.ticket));
   const [dept, setDept] = useState('');
   const [category, setCategory] = useState('');
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -80,8 +85,7 @@ export function Review() {
   if (!load.data) return <ErrorBox error={load.error ?? 'ไม่พบเรื่องนี้'} />;
   const [{ ticket: t, history }, depts] = load.data;
   const c = categoryOf(t.category);
-  const hint = suggestDepartment(t.location, depts);
-  const chosen = dept || (t.status === 'SUBMITTED' ? hint?.id ?? '' : '');
+  const chosen = dept;
   const act = async (fn: () => Promise<unknown>, msg: string) => {
     setBusy(true); setErr('');
     try { await fn(); toast(msg); setRejectOpen(false); setDept(''); load.reload(); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
@@ -90,6 +94,7 @@ export function Review() {
   return (
     <>
       <Crumb to="/admin" label="กล่องเรื่องเข้า" current={shortId(t.id)} />
+      <RoutingNotice ticket={t} />
       <div className="stack" style={{ ['--gap' as string]: '8px' }}><div className="row wrap"><Badge status={t.status} /><span className="small muted strong">{shortId(t.id)}</span><span className="small muted">· {fmtDate(t.createdAt)}</span></div><h1>{t.description.length > 70 ? t.description.slice(0, 70) + '…' : t.description}</h1></div>
       <div className="split review-split">
         <div className="stack" style={{ ['--gap' as string]: '24px' }}>
@@ -108,10 +113,10 @@ export function Review() {
                 <h3>มอบหมายหน่วยงาน</h3><p className="small muted">เลือกหน่วยงานที่รับผิดชอบ เรื่องจะเข้าคิวงานของหน่วยงานนั้นทันที</p>
                 {depts.length === 0 ? <Note>ยังไม่มีหน่วยงาน — เพิ่มที่เมนู “หน่วยงาน” ก่อน</Note> : <>
                   <Select id="dept" label="หน่วยงาน" icon="building" value={chosen} onChange={(e) => setDept(e.target.value)}><option value="" disabled>เลือกหน่วยงาน</option>{depts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</Select>
-                  {hint && <Note tone="sage" icon="sparkles">{hint.name} ดูแลอาคารนี้ (จากรายชื่ออาคารของหน่วยงาน)</Note>}
                   <Button icon="route" block busy={busy} disabled={!chosen} onClick={() => act(() => Api.assign(t.id, chosen), `มอบหมายให้${deptName(chosen)}แล้ว`)}>มอบหมายงาน</Button>
                 </>}
               </div>
+              {t.routingStatus === 'REVIEW' && <div className="card stack"><h3>ลองส่งต่ออัตโนมัติอีกครั้ง</h3><p className="small muted">ใช้หลังแก้กฎหรือเมื่อบริการหน่วยงานกลับมาพร้อม</p><Button kind="outline" icon="undo" busy={busy} onClick={() => act(() => Api.retryRouting(t.id), 'ส่งให้ระบบลองใหม่แล้ว')}>ลองส่งต่ออัตโนมัติอีกครั้ง</Button></div>}
               <div className="card lg stack" style={{ ['--gap' as string]: '12px' }}><h3>ไม่รับเรื่องนี้?</h3><p className="small muted">เช่น ไม่ใช่งานซ่อม หรือแจ้งซ้ำ ผู้แจ้งจะเห็นเหตุผลในไทม์ไลน์</p><Button kind="outline" icon="x" block onClick={() => setRejectOpen(true)}>ปฏิเสธพร้อมเหตุผล</Button></div>
             </>
           )}
@@ -124,6 +129,7 @@ export function Review() {
               <Button icon="route" block busy={busy} disabled={!dept} onClick={() => act(() => Api.assign(t.id, dept), `ส่งต่อให้${deptName(dept)}แล้ว`)}>ยืนยันเปลี่ยนหน่วยงาน</Button>
             </div>
           )}
+          {t.status === 'ASSIGNED' && <Button kind="outline" icon="x" onClick={() => setRejectOpen(true)}>ปฏิเสธพร้อมเหตุผล</Button>}
           <div className="card lg stack"><div className="row between"><h3>สถานะ</h3><Badge status={t.status} /></div><VSteps status={t.status} />{t.departmentName && t.status !== 'ASSIGNED' && <Meta icon="building">{t.departmentName}</Meta>}</div>
           <div className="card lg stack"><h3>ไทม์ไลน์</h3><Timeline history={history} /></div>
         </div>
@@ -165,6 +171,7 @@ export function Departments() {
     <>
       <PageHead title="หน่วยงาน" sub="หน่วยงานที่รับเรื่องซ่อม · ใช้เป็นตัวเลือกตอนมอบหมายงาน"><Button icon="plus" onClick={() => { setErr(''); setEdit({ name: '', contactEmail: '', buildings: [] }); }}>เพิ่มหน่วยงาน</Button></PageHead>
       <ErrorBox error={load.error} />
+      <RoutingRules departments={depts} />
       {load.loading && !load.data ? <div className="cards3"><Skeleton h={220} /><Skeleton h={220} /><Skeleton h={220} /></div> : (
         <div className="cards3">
           {depts.map((d, i) => (
@@ -193,7 +200,7 @@ export function Departments() {
               {(edit.buildings ?? []).map((b) => <span key={b} className="tag">{b}<button type="button" aria-label={`ลบ ${b}`} onClick={() => setEdit({ ...edit, buildings: edit.buildings!.filter((x) => x !== b) })}><Icon name="x" size={12} /></button></span>)}
               <input style={{ padding: 4, minWidth: 160 }} value={newB} onChange={(e) => setNewB(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addBuilding(); } }} onBlur={addBuilding} placeholder="พิมพ์ชื่ออาคารแล้วกด Enter" aria-label="เพิ่มอาคาร" />
             </div>
-            <span className="help">ใช้ช่วยแนะนำหน่วยงานตอนมอบหมายงาน (เทียบกับสถานที่ที่ผู้แจ้งระบุ)</span>
+            <span className="help">ข้อมูลพื้นที่รับผิดชอบของหน่วยงาน · กฎส่งต่ออัตโนมัติปัจจุบันเลือกตามหมวดปัญหา</span>
           </div>
           <div style={{ flex: 1 }} />
           <hr className="divider" />
@@ -260,7 +267,7 @@ export function Users() {
         <div className="card lg stack" style={{ ['--gap' as string]: '12px' }}>
           <h3>สิทธิ์ตามบทบาท</h3>
           {role('user', 'honey', 'ผู้เยี่ยมชม (Guest)', ['แจ้งปัญหาพร้อมอีเมลติดต่อ', 'ติดตามด้วยเลขที่เรื่อง'])}
-          {role('heart', 'pink', 'ผู้แจ้ง (Reporter) — สมัครเอง', ['ดูเรื่องของตัวเอง · ยกเลิกก่อนมอบหมาย', 'ยืนยันผล หรือขอแก้ไขใหม่พร้อมเหตุผล'])}
+          {role('heart', 'pink', 'ผู้แจ้ง (Reporter) — สมัครเอง', ['ดูเรื่องของตัวเอง · ยกเลิกก่อนเจ้าหน้าที่เริ่มงาน', 'ยืนยันผล หรือขอแก้ไขใหม่พร้อมเหตุผล'])}
           {role('wrench', 'lilac', 'เจ้าหน้าที่ (Staff)', ['เห็นเฉพาะงานของหน่วยงานตัวเอง', 'เริ่มงาน และส่งงานพร้อมรูปหลังแก้ไข'])}
           {role('shield', 'sage', 'ผู้ดูแลระบบ (Admin)', ['มอบหมาย · ปฏิเสธ · เปลี่ยนหน่วยงาน', 'จัดการหน่วยงานและบัญชีเจ้าหน้าที่'])}
         </div>

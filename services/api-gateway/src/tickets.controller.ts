@@ -117,6 +117,13 @@ export class TicketsController implements OnModuleInit {
     return this.forward('assignTicket', { id, departmentId });
   }
 
+  @Post(':id/retry-routing')
+  @HttpCode(200)
+  @Roles('ADMIN')
+  retryRouting(@Param('id') id: string) {
+    return this.forward('retryRouting', { id });
+  }
+
   @Delete(':id')
   @Roles('REPORTER')
   async cancel(@CurrentUser() user: AuthUser, @Param('id') id: string) {

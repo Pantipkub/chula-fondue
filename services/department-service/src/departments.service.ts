@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './department.dto.js';
 import { Department } from './department.entity.js';
+import { RoutingRule } from './routing-rule.entity.js';
 
 @Injectable()
 export class DepartmentsService {
@@ -30,7 +31,15 @@ export class DepartmentsService {
   }
 
   async remove(id: string) {
-    await this.repo.remove(await this.findOne(id));
+    await this.repo.manager.transaction(async (manager) => {
+      await manager.query("SELECT pg_advisory_xact_lock(hashtext('department-routing-rules'))");
+      const department = await manager.findOne(Department, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!department) throw new NotFoundException(`Department ${id} not found`);
+      if (await manager.existsBy(RoutingRule, { departmentId: id, enabled: true })) {
+        throw new ConflictException('Disable or move active routing rules before deleting this department');
+      }
+      await manager.remove(department);
+    });
   }
 
   private async assertNameFree(name: string) {

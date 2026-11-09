@@ -1,6 +1,6 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-// Field names match the camelCase form of proto/ticket.proto, so entities are returned as-is.
+// Public fields match the camelCase form of proto/ticket.proto; the response mapper omits internal contact data.
 // Optional strings default to '' (the proto3 default) and timestamps are ISO strings.
 @Entity()
 export class Ticket {
@@ -45,6 +45,10 @@ export class Ticket {
 
   @Column({ default: '' })
   departmentName: string;
+
+  @Column({ default: '' }) assignmentSource: string;
+  @Column({ default: '' }) routingRuleId: string;
+  @Column({ default: '' }) departmentContactEmail: string;
 
   @Column({ default: '' })
   reason: string;

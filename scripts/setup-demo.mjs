@@ -6,3 +6,4 @@ if (!existsSync('.env.demo')) {
 console.log('Local configuration ready: .env.demo (existing .env preserved).');
 console.log('Start: docker compose --env-file .env.demo -p fondue-demo up -d --build');
 console.log('Open http://localhost:8080');
+console.log('Auto-routing: set AUTO_ROUTING_ENABLED=true in .env.demo, restart ticket-service, then npm run seed:demo.');

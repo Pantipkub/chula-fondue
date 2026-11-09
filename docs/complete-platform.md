@@ -5,7 +5,7 @@ This implementation extends the [Progress 3 ADR](https://docs.google.com/documen
 | Use case | Implementation | UI |
 | --- | --- | --- |
 | UC-01 Report | Registered/guest JWT; 1–5 JPEG/PNG/WebP, 5 MB each | `/report` |
-| UC-02 Route | Admin assignment, rerouting, recategorization, rejection | `/admin` |
+| UC-02 Route | Automatic category rules with durable retry; admin fallback, rerouting, recategorization, rejection before work starts | `/admin`, `/admin/departments` |
 | UC-03 Resolve | Staff department scope; start then resolve with proof | `/staff` |
 | UC-04 Track | Owner list/history; same-session guest tracking | `/my`, `/track` |
 | UC-05 Notify | Outbox → RabbitMQ → MongoDB; optional Gmail worker | `/notifications` |

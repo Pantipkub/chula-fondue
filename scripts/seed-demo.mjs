@@ -17,6 +17,14 @@ for (const department of [
   if (!departments.some(d => d.name === department.name)) await request('/departments', 'POST', department, token);
 }
 departments = await request('/departments', 'GET', undefined, token);
+// Preserve existing rules (including disabled ones), so repeated seeding never overwrites admin changes.
+const rules = await request('/routing-rules', 'GET', undefined, token);
+for (const category of ['Electrical', 'Plumbing', 'Air conditioning', 'IT / Network', 'Building']) {
+  if (!rules.some(rule => rule.category === category)) {
+    const name = category === 'IT / Network' ? 'ฝ่ายเทคโนโลยีสารสนเทศ' : 'งานอาคารและสถานที่';
+    await request('/routing-rules', 'POST', { category, departmentId: departments.find(d => d.name === name).id, enabled: true }, token);
+  }
+}
 await request('/auth/register', 'POST', { email: 'reporter@fondue.test', password });
 await request('/auth/users', 'POST', { email: 'staff@fondue.test', password, role: 'STAFF', departmentId: departments.find(d => d.name === 'งานอาคารและสถานที่').id }, token);
 console.log('Demo accounts ready: admin@fondue.test / reporter@fondue.test / staff@fondue.test');

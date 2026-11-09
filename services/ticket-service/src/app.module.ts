@@ -7,19 +7,21 @@ import { HealthController } from './health.controller.js';
 import { Ticket, TicketHistory } from './ticket.entity.js';
 import { TicketsController } from './tickets.controller.js';
 import { TicketsService } from './tickets.service.js';
+import { TicketRoutingJob } from './ticket-routing-job.entity.js';
+import { AutoRoutingService } from './auto-routing.service.js';
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: process.env.TICKET_DATABASE_URL ?? 'postgresql://fondue:fondue@localhost:5433/ticket',
-      entities: [Ticket, TicketHistory, OutboxEvent],
+      entities: [Ticket, TicketHistory, OutboxEvent, TicketRoutingJob],
       synchronize: true,
       // Keep retrying while PostgreSQL starts; Docker restarts the container if it never comes up.
       retryAttempts: 20,
       retryDelay: 3000,
     }),
-    TypeOrmModule.forFeature([Ticket, TicketHistory, OutboxEvent]),
+    TypeOrmModule.forFeature([Ticket, TicketHistory, OutboxEvent, TicketRoutingJob]),
     ClientsModule.register([
       { name: 'ANALYTICS_BROKER', transport: Transport.RMQ, options: {
         urls: [process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672'],
@@ -42,6 +44,6 @@ import { TicketsService } from './tickets.service.js';
     ]),
   ],
   controllers: [HealthController, TicketsController],
-  providers: [TicketsService, BackgroundService],
+  providers: [TicketsService, BackgroundService, AutoRoutingService],
 })
 export class AppModule {}

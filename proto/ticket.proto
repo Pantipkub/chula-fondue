@@ -14,6 +14,7 @@ service TicketService {
   rpc ConfirmResolution (TicketIdRequest) returns (Ticket);
   rpc ReopenTicket (ReasonRequest) returns (Ticket);
   rpc RecategorizeTicket (RecategorizeRequest) returns (Ticket);
+  rpc RetryRouting (TicketIdRequest) returns (Ticket);
 }
 
 message Ticket {
@@ -34,6 +35,10 @@ message Ticket {
   string resolved_at = 16;
   string closed_at = 17;
   repeated string completion_photo_urls = 13; // proof photos added when resolving
+  string assignment_source = 18;
+  string routing_rule_id = 19;
+  string routing_status = 20;
+  string routing_reason = 21;
 }
 
 message HistoryEntry {

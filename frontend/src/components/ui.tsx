@@ -163,7 +163,10 @@ export function Timeline({ history, reporterLabel = 'ผู้แจ้ง' }: {
     <div className="timeline">
       {rows.map((h, i) => {
         const d = describe(h);
-        const who = ['SUBMITTED', 'CANCELLED', 'CLOSED'].includes(h.toStatus) || d.quote && h.toStatus === 'IN_PROGRESS' ? reporterLabel : h.toStatus === 'ASSIGNED' || h.toStatus === 'REJECTED' ? 'ผู้ดูแลระบบ' : 'เจ้าหน้าที่';
+        const who = /^(Automatically assigned to |Automatic routing needs review: |Automatically closed after )/.test(h.note)
+          ? 'ระบบอัตโนมัติ' : /^(Category changed to |Automatic routing requested by admin)/.test(h.note)
+            ? 'ผู้ดูแลระบบ' : ['SUBMITTED', 'CANCELLED', 'CLOSED'].includes(h.toStatus) || d.quote && h.toStatus === 'IN_PROGRESS'
+              ? reporterLabel : h.toStatus === 'ASSIGNED' || h.toStatus === 'REJECTED' ? 'ผู้ดูแลระบบ' : 'เจ้าหน้าที่';
         return (
           <div className="tl-item" key={`${h.changedAt}-${i}`}>
             <div className="tl-rail"><Bubble icon={d.icon} tone={d.tone} size={34} iconSize={16} /></div>
@@ -207,15 +210,31 @@ export const Meta = ({ icon, children }: { icon: string; children: ReactNode }) 
 export const Logo = ({ to = '/' }: { to?: string }) => <Link className="logo" to={to}><span className="mark"><Icon name="wrench" size={20} /></span><span><b>Fondue</b><small>ระบบแจ้งซ่อม จุฬาฯ</small></span></Link>;
 
 /** Loads data once (and again when `deps` change); returns [data, error, reload]. */
-export function useLoad<T>(fn: () => Promise<T>, deps: unknown[] = []) {
+export function useLoad<T>(fn: () => Promise<T>, deps: unknown[] = [], poll?: (data: T) => boolean) {
   const [state, setState] = useState<{ data?: T; error?: string; loading: boolean }>({ loading: true });
   const [tick, setTick] = useState(0);
+  const pollRef = useRef(poll);
+  const lastData = useRef<T>();
+  pollRef.current = poll;
+  const reload = useCallback(() => setTick((t) => t + 1), []);
   useEffect(() => {
     let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     setState((s) => ({ ...s, loading: true }));
-    fn().then((data) => live && setState({ data, loading: false }), (e: Error) => live && setState({ error: e.message, loading: false }));
-    return () => { live = false; };
+    fn().then((data) => {
+      if (!live) return;
+      lastData.current = data;
+      setState({ data, loading: false });
+      // Schedule only after the previous request finishes. Unmount and terminal states stop polling.
+      if (pollRef.current?.(data)) timer = setTimeout(reload, 3000);
+    }, (e: Error) => {
+      if (!live) return;
+      setState((s) => ({ ...s, error: e.message, loading: false }));
+      // A brief outage must not leave an already-pending ticket permanently stuck in the browser.
+      if (lastData.current !== undefined && pollRef.current?.(lastData.current)) timer = setTimeout(reload, 3000);
+    });
+    return () => { live = false; if (timer) clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, tick]);
-  return { ...state, reload: () => setTick((t) => t + 1) };
+  return { ...state, reload };
 }

@@ -119,6 +119,7 @@ services:
       TICKET_DATABASE_URL: ${TICKET_DATABASE_URL:-postgresql://fondue:fondue@postgres:5432/ticket}
       DEPARTMENT_SERVICE_URL: http://department-service:3001
       DEPARTMENT_TIMEOUT_MS: 3000
+      AUTO_ROUTING_ENABLED: ${AUTO_ROUTING_ENABLED:-false}
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     expose: ['50051', '8081']
     # Department Service is not listed: it is only needed when assigning, and a missing one gives a

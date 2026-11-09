@@ -2,6 +2,8 @@
 
 export type Role = 'REPORTER' | 'GUEST' | 'ADMIN' | 'STAFF';
 export type Status = 'SUBMITTED' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'REJECTED' | 'CANCELLED';
+export type RoutingStatus = 'NONE' | 'PENDING' | 'RETRY' | 'REVIEW' | 'DONE' | 'STOPPED';
+export interface RoutingRule { id: string; category: string; departmentId: string; enabled: boolean }
 
 export interface Ticket {
   id: string;
@@ -17,6 +19,10 @@ export interface Ticket {
   reason: string;
   createdAt: string;
   updatedAt: string;
+  assignmentSource?: '' | 'AUTO' | 'ADMIN';
+  routingRuleId?: string;
+  routingStatus?: RoutingStatus;
+  routingReason?: string;
 }
 export interface HistoryEntry { id: number; ticketId: string; fromStatus: string; toStatus: Status; note: string; changedAt: string }
 export interface Department { id: string; name: string; contactEmail: string; buildings: string[] }
@@ -42,6 +48,9 @@ function friendly(status: number, raw: string) {
   if (status === 401) return raw.includes('Invalid email') ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : 'กรุณาเข้าสู่ระบบอีกครั้ง';
   if (status === 403) return 'คุณไม่มีสิทธิ์ทำรายการนี้';
   if (status === 404) return 'ไม่พบข้อมูลที่ต้องการ';
+  if (status === 409 && raw.includes('routing rule already exists')) return 'หมวดนี้มีกฎที่เปิดใช้อยู่แล้ว กรุณาแก้ไขกฎเดิม';
+  if (status === 409 && raw.includes('active routing rules')) return 'กรุณาปิดหรือย้ายกฎส่งต่อที่ใช้หน่วยงานนี้ก่อนลบ';
+  if (status === 409 && raw.includes('routing is disabled')) return 'ระบบส่งต่ออัตโนมัติยังไม่เปิดใช้งาน';
   if (status === 409) return raw.includes('exists') || raw.includes('already') ? 'มีข้อมูลนี้อยู่แล้ว' : 'สถานะของเรื่องเปลี่ยนไปแล้ว รีเฟรชหน้าแล้วลองใหม่';
   const known: [RegExp, string][] = [
     [/password must be longer/i, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'],
@@ -87,6 +96,10 @@ export interface AnalyticsReport {
   byDepartment: { id: string; name: string; count: number; mttrHours: number | null }[];
 }
 export const Api = {
+  routingRules: () => api<RoutingRule[]>('/routing-rules'),
+  createRoutingRule: (rule: Omit<RoutingRule, 'id'>) => api<RoutingRule>('/routing-rules', { method: 'POST', json: rule }),
+  updateRoutingRule: (id: string, rule: Partial<Omit<RoutingRule, 'id'>>) => api<RoutingRule>(`/routing-rules/${id}`, { method: 'PUT', json: rule }),
+  retryRouting: (id: string) => api<Ticket>(`/tickets/${id}/retry-routing`, { method: 'POST' }),
   users: () => api<PublicUser[]>('/auth/users'),
   analytics: (q: Record<string, string>) => api<AnalyticsReport>('/analytics?' + new URLSearchParams(q)),
   notifications: () => api<{ eventId: string; ticketId: string; status: Status; recipientEmail: string; delivery: string; receivedAt: string }[]>('/notifications'),

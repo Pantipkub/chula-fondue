@@ -3,10 +3,12 @@ import { status as GrpcStatus } from '@grpc/grpc-js';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository } from 'typeorm';
+import { EntityManager, In, LessThan, Repository } from 'typeorm';
 import { OutboxEvent } from './outbox.entity.js';
 import { currentExpectedVersion, currentRequestId } from './request-context.js';
 import { Ticket, TicketHistory } from './ticket.entity.js';
+import { autoRoutingEnabled, TicketRoutingJob } from './ticket-routing-job.entity.js';
+import type { RoutingClaim, RoutingMatch } from './auto-routing.service.js';
 
 // In Docker Compose this is http://department-service:3001: a name that Docker DNS resolves.
 const DEPARTMENT_SERVICE_URL = process.env.DEPARTMENT_SERVICE_URL ?? 'http://localhost:3001';
@@ -59,7 +61,9 @@ export class TicketsService implements OnModuleInit {
       reporterEmail: req.reporterEmail,
       reporterId: req.reporterId ?? '',
     });
-    return this.setStatus(ticket, 'SUBMITTED', 'Ticket created');
+    return this.setStatus(ticket, 'SUBMITTED', 'Ticket created', undefined, async (manager, saved) => {
+      if (autoRoutingEnabled()) await this.resetRouting(manager, saved.id);
+    });
   }
 
   async list(req: { status?: string; departmentId?: string; reporterEmail?: string; reporterId?: string; includeCancelled?: boolean }) {
@@ -74,20 +78,25 @@ export class TicketsService implements OnModuleInit {
       ] : { ...filters, ...(req.reporterEmail && { reporterEmail: req.reporterEmail }) },
       order: { createdAt: 'DESC' },
     });
-    return { tickets: req.includeCancelled ? tickets : tickets.filter((t) => t.status !== 'CANCELLED') };
+    return { tickets: await this.present(req.includeCancelled ? tickets : tickets.filter((t) => t.status !== 'CANCELLED')) };
   }
 
   async getHistory(id: string) {
     const ticket = await this.load(id);
     const history = await this.history.find({ where: { ticketId: ticket.id }, order: { id: 'ASC' } });
-    return { ticket, history };
+    return { ticket: (await this.present([ticket]))[0], history };
   }
 
   async recategorize(req: { id: string; category: string }) {
     requireFields(req, 'category');
     const ticket = await this.load(req.id, 'SUBMITTED', 'ASSIGNED');
     ticket.category = req.category.trim();
-    return this.setStatus(ticket, ticket.status, `Category changed to ${ticket.category}`);
+    return this.setStatus(ticket, ticket.status, `Category changed to ${ticket.category}`, undefined, async (manager) => {
+      if (ticket.status === 'SUBMITTED') {
+        if (autoRoutingEnabled()) await this.resetRouting(manager, ticket.id);
+        else await this.stopRouting(manager, ticket.id, 'STOPPED', 'AUTO_ROUTING_DISABLED');
+      }
+    });
   }
 
   async assign(req: { id: string; departmentId: string }) {
@@ -96,19 +105,24 @@ export class TicketsService implements OnModuleInit {
     const department = await this.fetchDepartment(req.departmentId);
     ticket.departmentId = department.id;
     ticket.departmentName = department.name;
-    return this.setStatus(ticket, 'ASSIGNED', `Assigned to ${department.name}`, department.contactEmail);
+    ticket.departmentContactEmail = department.contactEmail;
+    ticket.assignmentSource = 'ADMIN'; ticket.routingRuleId = '';
+    return this.setStatus(ticket, 'ASSIGNED', `Assigned to ${department.name}`, department.contactEmail,
+      (manager) => this.stopRouting(manager, ticket.id, 'DONE'));
   }
 
   async cancel(id: string) {
-    const ticket = await this.load(id, 'SUBMITTED');
-    return this.setStatus(ticket, 'CANCELLED', 'Cancelled by reporter');
+    const ticket = await this.load(id, 'SUBMITTED', 'ASSIGNED');
+    return this.setStatus(ticket, 'CANCELLED', 'Cancelled by reporter', ticket.departmentContactEmail,
+      (manager) => this.stopRouting(manager, ticket.id, 'STOPPED'));
   }
 
   async reject(req: { id: string; reason: string }) {
-    const ticket = await this.load(req.id, 'SUBMITTED');
+    const ticket = await this.load(req.id, 'SUBMITTED', 'ASSIGNED');
     requireFields(req, 'reason');
     ticket.reason = req.reason;
-    return this.setStatus(ticket, 'REJECTED', req.reason, ticket.reporterEmail);
+    return this.setStatus(ticket, 'REJECTED', req.reason, [ticket.reporterEmail, ticket.departmentContactEmail],
+      (manager) => this.stopRouting(manager, ticket.id, 'STOPPED'));
   }
 
   async startProgress(id: string) {
@@ -160,35 +174,106 @@ export class TicketsService implements OnModuleInit {
     }
   }
 
-  private async setStatus(ticket: Ticket, toStatus: string, note: string, notifyEmail?: string) {
-    const now = new Date().toISOString();
-    const fromStatus = ticket.status ?? '';
-    return this.tickets.manager.transaction(async (manager) => {
-      if (ticket.id) {
-        const current = await manager.findOne(Ticket, { where: { id: ticket.id }, lock: { mode: 'pessimistic_write' } });
-        const expectedVersion = currentExpectedVersion();
-        if (!current || current.version !== ticket.version || current.status !== fromStatus ||
-            (expectedVersion !== undefined && expectedVersion !== current.version)) {
-          throw rpcError(GrpcStatus.ABORTED, 'Ticket changed concurrently; reload and retry');
+  async retryRouting(id: string) {
+    if (!autoRoutingEnabled()) throw rpcError(GrpcStatus.FAILED_PRECONDITION, 'Automatic routing is disabled');
+    const ticket = await this.load(id, 'SUBMITTED');
+    return this.setStatus(ticket, 'SUBMITTED', 'Automatic routing requested by admin', undefined,
+      (manager) => this.resetRouting(manager, ticket.id));
+  }
+
+  // Every writer locks ticket before routing job. The lease and version fence delayed HTTP responses.
+  async finishRouting(claim: RoutingClaim, result: RoutingMatch | string, retryAfterMs?: number) {
+    await this.tickets.manager.transaction(async (manager) => {
+      const ticket = await manager.findOne(Ticket, { where: { id: claim.ticket.id }, lock: { mode: 'pessimistic_write' } });
+      const job = await manager.findOne(TicketRoutingJob, { where: { ticketId: claim.ticket.id }, lock: { mode: 'pessimistic_write' } });
+      if (!ticket || !job || ticket.status !== 'SUBMITTED' || ticket.version !== claim.ticket.version ||
+          ticket.category !== claim.ticket.category || job.state !== 'PROCESSING' || job.leaseToken !== claim.token ||
+          job.leaseUntil <= new Date().toISOString()) {
+        throw rpcError(GrpcStatus.ABORTED, 'Routing result is stale');
+      }
+      job.leaseToken = ''; job.leaseUntil = ''; job.updatedAt = new Date().toISOString();
+      if (typeof result !== 'string' && result.result === 'MATCHED') {
+        ticket.departmentId = result.department.id; ticket.departmentName = result.department.name;
+        ticket.departmentContactEmail = result.department.contactEmail;
+        ticket.assignmentSource = 'AUTO'; ticket.routingRuleId = result.ruleId;
+        await this.writeTransition(manager, ticket, 'ASSIGNED', `Automatically assigned to ${result.department.name} (category: ${result.category}; rule: ${result.ruleId})`,
+          [result.department.contactEmail], claim.requestId);
+        job.state = 'DONE'; job.lastReason = '';
+      } else {
+        const reason = typeof result === 'string' ? result : result.result;
+        job.lastReason = reason;
+        if (retryAfterMs !== undefined) {
+          job.state = 'RETRY'; job.nextAttemptAt = new Date(Date.now() + retryAfterMs).toISOString();
+        } else {
+          job.state = 'REVIEW';
+          await this.writeTransition(manager, ticket, 'SUBMITTED', `Automatic routing needs review: ${reason}`, [], claim.requestId);
         }
       }
-      ticket.status = toStatus;
-      ticket.version = (ticket.version ?? 0) + 1;
-      ticket.createdAt ??= now;
-      ticket.updatedAt = now;
-      if (toStatus === 'RESOLVED') ticket.resolvedAt = now;
-      if (toStatus === 'CLOSED') ticket.closedAt = now;
-      const saved = await manager.save(ticket);
-      await manager.save(TicketHistory, { ticketId: saved.id, fromStatus, toStatus, note, changedAt: now });
-      const eventId = randomUUID();
-      // Ticket, history and outbox commit together; no broker call is made in the business transaction.
-      await manager.save(OutboxEvent, {
-        id: eventId, createdAt: now, notificationSent: !notifyEmail, analyticsSent: false,
-        payload: { ...saved, eventId, requestId: currentRequestId(), ticketId: saved.id,
-          recipientEmail: notifyEmail ?? '', changedAt: now, note, fromStatus },
-      });
-      return saved;
+      await manager.save(job);
     });
+  }
+
+  private async resetRouting(manager: EntityManager, ticketId: string) {
+    const now = new Date().toISOString();
+    const job = await manager.findOneBy(TicketRoutingJob, { ticketId });
+    await manager.save(TicketRoutingJob, { ticketId, createdAt: job?.createdAt ?? now, updatedAt: now,
+      state: 'PENDING', attempts: 0, nextAttemptAt: now, lastReason: '', leaseToken: '', leaseUntil: '', requestId: currentRequestId() });
+  }
+
+  private async stopRouting(manager: EntityManager, ticketId: string, state: 'DONE' | 'STOPPED', lastReason = '') {
+    await manager.update(TicketRoutingJob, { ticketId }, { state, lastReason, leaseToken: '', leaseUntil: '', updatedAt: new Date().toISOString() });
+  }
+
+  private async present(tickets: Ticket[]) {
+    if (!tickets.length) return [];
+    const jobs = await this.tickets.manager.find(TicketRoutingJob, { where: { ticketId: In(tickets.map((ticket) => ticket.id)) } });
+    const byId = new Map(jobs.map((job) => [job.ticketId, job]));
+    return tickets.map(({ departmentContactEmail: _internal, ...ticket }) => {
+      const job = byId.get(ticket.id);
+      return { ...ticket, routingStatus: job?.state === 'PROCESSING' ? 'PENDING' : job?.state ?? 'NONE', routingReason: job?.lastReason ?? '' };
+    });
+  }
+
+  private async setStatus(ticket: Ticket, toStatus: string, note: string, notifyEmail?: string | string[],
+    after?: (manager: EntityManager, saved: Ticket) => Promise<unknown>) {
+    const saved = await this.tickets.manager.transaction(async (manager) => {
+      const result = await this.writeTransition(manager, ticket, toStatus, note, [notifyEmail ?? ''].flat());
+      await after?.(manager, result);
+      return result;
+    });
+    return (await this.present([saved]))[0];
+  }
+
+  private async writeTransition(manager: EntityManager, ticket: Ticket, toStatus: string, note: string, notifyEmails: string[], requestId = currentRequestId()) {
+    const now = new Date().toISOString();
+    const fromStatus = ticket.status ?? '';
+    if (ticket.id) {
+      const current = await manager.findOne(Ticket, { where: { id: ticket.id }, lock: { mode: 'pessimistic_write' } });
+      const expectedVersion = currentExpectedVersion();
+      if (!current || current.version !== ticket.version || current.status !== fromStatus ||
+          (expectedVersion !== undefined && expectedVersion !== current.version)) {
+        throw rpcError(GrpcStatus.ABORTED, 'Ticket changed concurrently; reload and retry');
+      }
+    }
+    ticket.status = toStatus;
+    ticket.version = (ticket.version ?? 0) + 1;
+    ticket.createdAt ??= now;
+    ticket.updatedAt = now;
+    if (toStatus === 'RESOLVED') ticket.resolvedAt = now;
+    if (toStatus === 'CLOSED') ticket.closedAt = now;
+    const saved = await manager.save(ticket);
+    await manager.save(TicketHistory, { ticketId: saved.id, fromStatus, toStatus, note, changedAt: now });
+    // Ticket, history and outbox commit together; no broker call is made in the business transaction.
+    const recipients = [...new Set(notifyEmails.filter(Boolean))];
+    const { departmentContactEmail: _internal, ...publicTicket } = saved;
+    for (const [index, recipientEmail] of (recipients.length ? recipients : ['']).entries()) {
+      const eventId = randomUUID();
+      await manager.save(OutboxEvent, {
+        id: eventId, createdAt: now, notificationSent: !recipientEmail, analyticsSent: index !== 0,
+        payload: { ...publicTicket, eventId, requestId, ticketId: saved.id, recipientEmail, changedAt: now, note, fromStatus },
+      });
+    }
+    return saved;
   }
 
   private async fetchDepartment(departmentId: string): Promise<{ id: string; name: string; contactEmail: string }> {

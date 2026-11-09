@@ -4,7 +4,8 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Api } from '../lib/api';
 import type { HistoryEntry, Ticket } from '../lib/api';
 import { homeFor, useAuth } from '../lib/auth';
-import { CATEGORIES, STATUS, UUID_RE, categoryOf, fmtDate, recentTickets, shortId } from '../lib/format';
+import { CATEGORIES, STATUS, UUID_RE, categoryOf, fmtDate, isRoutingPending, recentTickets, shortId } from '../lib/format';
+import { RoutingNotice } from '../components/routing';
 import { Badge, Bubble, Button, ErrorBox, HSteps, Icon, Input, Logo, Meta, Note, Photo, Timeline, useLoad } from '../components/ui';
 
 // ---------------------------------------------------------------- landing
@@ -46,7 +47,7 @@ export function Landing() {
       <section className="section stack" style={{ background: '#fff', ['--gap' as string]: '40px', alignItems: 'center' }}>
         <div className="stack center" style={{ ['--gap' as string]: '8px' }}><span className="small strong" style={{ color: 'var(--pink-600)' }}>วิธีใช้งาน</span><h1>แจ้งซ่อมง่าย ๆ ใน 3 ขั้นตอน</h1></div>
         <div className="cards3" style={{ width: '100%', maxWidth: 1280 }}>
-          {[['01', 'camera', 'ถ่ายรูปและบอกตำแหน่ง', 'เลือกหมวดปัญหา ระบุอาคาร/ห้อง และแนบรูปได้สูงสุด 5 รูป (ไม่เกิน 5 MB ต่อรูป)'], ['02', 'route', 'ส่งต่อหน่วยงาน', 'ผู้ดูแลตรวจสอบและมอบหมายให้หน่วยงานที่รับผิดชอบ เช่น ฝ่ายไฟฟ้า ฝ่ายประปา'], ['03', 'check', 'ติดตามและยืนยันผล', 'ดูไทม์ไลน์ทุกขั้นตอน เมื่อแก้ไขเสร็จกดยืนยันปิดเรื่อง หรือขอให้แก้ไขใหม่ได้']].map(([n, i, t, d]) => (
+          {[['01', 'camera', 'ถ่ายรูปและบอกตำแหน่ง', 'เลือกหมวดปัญหา ระบุอาคาร/ห้อง และแนบรูปได้สูงสุด 5 รูป (ไม่เกิน 5 MB ต่อรูป)'], ['02', 'route', 'ส่งต่อหน่วยงาน', 'ระบบส่งต่ออัตโนมัติตามกฎของหมวดปัญหา และให้ผู้ดูแลตรวจสอบเรื่องที่ยังเลือกหน่วยงานไม่ได้'], ['03', 'check', 'ติดตามและยืนยันผล', 'ดูไทม์ไลน์ทุกขั้นตอน เมื่อแก้ไขเสร็จกดยืนยันปิดเรื่อง หรือขอให้แก้ไขใหม่ได้']].map(([n, i, t, d]) => (
             <div key={n} className="card lg stack" style={{ ['--gap' as string]: '14px' }}><div className="row between"><Bubble icon={i} size={52} iconSize={24} /><span style={{ fontFamily: 'var(--head)', fontWeight: 700, fontSize: 32, color: 'var(--pink-200)' }}>{n}</span></div><h3>{t}</h3><p className="muted small">{d}</p></div>
           ))}
         </div>
@@ -142,7 +143,7 @@ export function Register() {
   const rule = (ok: boolean, t: string) => <span className="row xs" style={{ ['--gap' as string]: '6px', color: ok ? 'var(--sage-800)' : 'var(--ink-600)' }}><Icon name={ok ? 'check' : 'x'} size={14} />{t}</span>;
   return (
     <AuthFrame title={'สมัครครั้งเดียว\nติดตามได้ทุกเรื่อง'} sub="บัญชีผู้แจ้ง (Reporter) ทำได้มากกว่าผู้เยี่ยมชม"
-      aside={<div className="stack" style={{ ['--gap' as string]: '10px' }}>{['ดูรายการเรื่องที่แจ้งทั้งหมดในที่เดียว', 'ยกเลิกเรื่องที่ยังไม่ถูกมอบหมาย', 'ยืนยันผลการซ่อม หรือขอแก้ไขใหม่พร้อมเหตุผล'].map((t) => <span key={t} className="row small strong"><Bubble icon="check" tone="sage" size={24} iconSize={14} />{t}</span>)}</div>}>
+      aside={<div className="stack" style={{ ['--gap' as string]: '10px' }}>{['ดูรายการเรื่องที่แจ้งทั้งหมดในที่เดียว', 'ยกเลิกเรื่องก่อนเจ้าหน้าที่เริ่มงาน', 'ยืนยันผลการซ่อม หรือขอแก้ไขใหม่พร้อมเหตุผล'].map((t) => <span key={t} className="row small strong"><Bubble icon="check" tone="sage" size={24} iconSize={14} />{t}</span>)}</div>}>
       <form onSubmit={submit} className="stack" style={{ width: 'min(440px, 100%)', ['--gap' as string]: '18px' }}>
         <div className="stack" style={{ ['--gap' as string]: '6px' }}><h1>สร้างบัญชีผู้แจ้ง</h1><p className="muted small">สมัครฟรี ใช้อีเมลมหาวิทยาลัยได้เลย</p></div>
         <ErrorBox error={err} />
@@ -194,7 +195,7 @@ export function Track() {
   const { ensureToken, session } = useAuth();
   const [q, setQ] = useState(param ?? '');
   const valid = !!param && UUID_RE.test(param);
-  const load = useLoad(async () => { if (!valid) return null; await ensureToken(); return Api.history(param!); }, [param]);
+  const load = useLoad(async () => { if (!valid) return null; await ensureToken(); return Api.history(param!); }, [param], (result) => !!result && isRoutingPending(result.ticket));
   const recent = recentTickets.list();
   const submit = (e: FormEvent) => { e.preventDefault(); const v = q.trim(); if (v) nav(`/track/${v}`); };
   return (
@@ -212,6 +213,7 @@ export function Track() {
       <ErrorBox error={load.error} />
       {load.data && (
         <TicketSummary ticket={load.data.ticket} history={load.data.history}>
+          <RoutingNotice ticket={load.data.ticket} />
           {session?.role === 'REPORTER' && session.email === load.data.ticket.reporterEmail
             ? <Button kind="outline" icon="eye" onClick={() => nav(`/tickets/${load.data!.ticket.id}`)}>เปิดในเรื่องของฉัน</Button>
             : (!session || session.role === 'GUEST') && <div className="note tone-pink note-action" style={{ alignItems: 'center' }}><Icon name="heart" /><span className="grow strong">เรื่องผู้เยี่ยมชมติดตามได้ด้วยเซสชันเดิม กรุณาเก็บเซสชันนี้ไว้ การสมัครสมาชิกใหม่ไม่โอนสิทธิ์เรื่องเดิม</span><Button sm onClick={() => nav('/register')}>สมัครสมาชิก</Button></div>}

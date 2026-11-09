@@ -1,4 +1,4 @@
-import type { HistoryEntry, Status } from './api';
+import type { HistoryEntry, Status, Ticket } from './api';
 
 export const STATUS: Record<Status, { label: string; tone: string; desc: string }> = {
   SUBMITTED: { label: 'ส่งเรื่องแล้ว', tone: 'honey', desc: 'ระบบได้รับเรื่องแล้ว รอผู้ดูแลตรวจสอบ' },
@@ -44,9 +44,14 @@ export function ago(iso: string) {
 /** Turns one history row into a Thai title, an optional detail line, and an icon. */
 export function describe(h: HistoryEntry) {
   const n = h.note ?? '';
+  if (n.startsWith('Category changed to ')) return { title: 'เปลี่ยนหมวดหมู่', detail: categoryOf(n.slice('Category changed to '.length)).label, icon: 'route', tone: 'pink' };
   switch (h.toStatus) {
-    case 'SUBMITTED': return { title: 'ส่งเรื่องแล้ว', detail: '', icon: 'send', tone: 'honey' };
-    case 'ASSIGNED': return { title: h.fromStatus === 'ASSIGNED' ? 'เปลี่ยนหน่วยงาน' : 'มอบหมายหน่วยงาน', detail: n.replace(/^Assigned to /, 'ให้ '), icon: 'route', tone: 'pink' };
+    case 'SUBMITTED': return n.startsWith('Automatic routing needs review: ')
+      ? { title: 'รอผู้ดูแลตรวจสอบ', detail: routingReason(n.slice('Automatic routing needs review: '.length)), icon: 'info', tone: 'honey' }
+      : n === 'Automatic routing requested by admin'
+        ? { title: 'ขอให้ระบบส่งต่ออีกครั้ง', detail: '', icon: 'route', tone: 'pink' }
+        : { title: 'ส่งเรื่องแล้ว', detail: '', icon: 'send', tone: 'honey' };
+    case 'ASSIGNED': return { title: n.startsWith('Automatically assigned to ') ? 'ระบบมอบหมายอัตโนมัติ' : h.fromStatus === 'ASSIGNED' ? 'เปลี่ยนหน่วยงาน' : 'มอบหมายหน่วยงาน', detail: n.replace(/^Automatically assigned to (.*?) \(category:.*$/, 'ให้ $1').replace(/^Assigned to /, 'ให้ '), icon: 'route', tone: 'pink' };
     case 'IN_PROGRESS': return h.fromStatus === 'RESOLVED'
       ? { title: 'ผู้แจ้งขอให้แก้ไขใหม่', detail: n, icon: 'undo', tone: 'lilac', quote: true }
       : { title: 'เริ่มดำเนินการ', detail: '', icon: 'wrench', tone: 'lilac' };
@@ -74,3 +79,10 @@ export function suggestDepartment<T extends { buildings: string[] }>(location: s
 }
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const isRoutingPending = (t: Ticket) => t.status === 'SUBMITTED' && (t.routingStatus === 'PENDING' || t.routingStatus === 'RETRY');
+export function routingReason(reason?: string) {
+  return ({ NO_RULE: 'ยังไม่มีกฎส่งต่อสำหรับหมวดนี้', AMBIGUOUS_RULES: 'พบกฎที่ชี้หลายหน่วยงาน ต้องให้ผู้ดูแลเลือก',
+    SERVICE_UNAVAILABLE: 'บริการหน่วยงานไม่พร้อม ระบบจะลองใหม่', RETRIES_EXHAUSTED: 'ระบบส่งต่อยังไม่สำเร็จ ให้ผู้ดูแลตรวจสอบ',
+    INVALID_RULE: 'ข้อมูลกฎส่งต่อไม่สมบูรณ์ ให้ผู้ดูแลตรวจสอบ', AUTO_ROUTING_DISABLED: 'รอผู้ดูแลมอบหมาย' } as Record<string, string>)[reason ?? ''] ?? 'รอผู้ดูแลตรวจสอบและส่งต่อ';
+}

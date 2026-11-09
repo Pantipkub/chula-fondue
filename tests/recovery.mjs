@@ -11,7 +11,7 @@ const email = `recovery-${run}@example.test`;
 await call('/auth/register', { method: 'POST', json: { email, password: 'RecoveryTest!2026' }, expected: 201 });
 const reporter = (await call('/auth/login', { method: 'POST', json: { email, password: 'RecoveryTest!2026' } })).accessToken;
 const department = await call('/departments', { token: admin, method: 'POST', json: { name: `Recovery ${run}`, contactEmail: email, buildings: [] }, expected: 201 });
-const ticket = await call('/tickets', { token: reporter, method: 'POST', form: photoForm({ category: 'Electrical', location: 'Recovery test', description: 'Broker outage fixture' }), expected: 201 });
+const ticket = await call('/tickets', { token: reporter, method: 'POST', form: photoForm({ category: 'Recovery manual fixture', location: 'Recovery test', description: 'Broker outage fixture' }), expected: 201 });
 let brokerStopped = false;
 try {
   docker('stop', 'rabbitmq'); brokerStopped = true;

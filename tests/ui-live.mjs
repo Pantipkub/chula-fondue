@@ -1,7 +1,7 @@
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 const base = process.env.WEB_URL ?? 'http://127.0.0.1:8080';
-const browser = await chromium.launch(process.env.BROWSER_CHANNEL === 'chromium' ? {} : { channel: 'msedge' });
+const browser = await chromium.launch(process.env.BROWSER_CHANNEL === 'chromium' ? {} : { channel: process.env.BROWSER_CHANNEL || 'msedge' });
 try {
   for (const [role, email, home, routes] of [
     ['admin', 'admin@fondue.test', '/admin', ['/admin', '/admin/departments', '/admin/users', '/admin/analytics', '/notifications']],

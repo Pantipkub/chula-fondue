@@ -5,6 +5,8 @@ jobs:
     # MongoDB 8 currently rejects Linux >= 6.19; keep the CI host on a supported LTS.
     runs-on: ubuntu-22.04
     timeout-minutes: 25
+    env:
+      AUTO_ROUTING_ENABLED: 'true'
     steps:
       - run: uname -a
       - uses: actions/checkout@v4
@@ -16,15 +18,24 @@ jobs:
       - run: npm test
       - run: npm run setup:demo
       - run: docker compose --env-file .env.demo -p fondue-demo up -d --build --wait --wait-timeout 180
+      - run: node --test tests/routing.integration.test.mjs
+        env:
+          ROUTING_TEST_DATABASE_URL: postgresql://fondue:fondue@127.0.0.1:5435/ticket
       - run: npm run test:e2e
       - run: npm run test:recovery
       - run: npm run seed:demo
+      - run: npm run test:routing
+      - run: npm run test:routing:recovery
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
         env:
           WEB_URL: http://127.0.0.1:8080
           BROWSER_CHANNEL: chromium
       - run: npm run test:ui:live
+        env:
+          WEB_URL: http://127.0.0.1:8080
+          BROWSER_CHANNEL: chromium
+      - run: node --env-file-if-exists=.env.demo tests/routing-ui.mjs
         env:
           WEB_URL: http://127.0.0.1:8080
           BROWSER_CHANNEL: chromium

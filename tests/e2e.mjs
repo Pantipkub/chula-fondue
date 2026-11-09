@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 const base = process.env.API_URL ?? 'http://localhost:3100';
 const run = Date.now().toString(36);
 const password = 'FondueTest!2026';
@@ -45,20 +47,22 @@ async function main() {
   await call('/departments', { token: reporter, expected: 403 });
   await call('/analytics', { token: reporter, expected: 403 });
   await call('/tickets', { token: reporter, method: 'POST', json: { category: 'Electrical', location: 'Engineering', description: 'No image' }, expected: 400 });
-  const fields = { category: 'Electrical', location: 'Engineering', description: `Broken light ${run}` };
+  const fields = { category: `Manual test ${run}`, location: 'Engineering', description: `Broken light ${run}` };
   const ticket = await call('/tickets', { token: reporter, method: 'POST', form: photoForm(fields), expected: 201 });
   const id = ticket.id;
   await call(`/tickets/${id}/history`, { token: other, expected: 403 });
   await call(`/tickets/${id}/assign`, { token: reporter, method: 'POST', json: { departmentId: department.id }, expected: 403 });
   await call(`/tickets/${id}/category`, { token: admin, method: 'POST', json: { category: 'Building' } });
+  // Isolate manual workflow assertions from the asynchronous routing transition.
+  await eventually(async () => !['PENDING', 'RETRY'].includes((await call(`/tickets/${id}/history`, { token: reporter })).ticket.routingStatus));
   await call(`/tickets/${id}/assign`, { token: admin, method: 'POST', json: { departmentId: department.id } });
   await call(`/tickets/${id}/start`, { token: wrongWorker, method: 'POST', expected: 403 });
-  await call(`/tickets/${id}`, { token: reporter, method: 'DELETE', expected: 409 });
   const starts = await Promise.all([1, 2].map(async () => {
     const response = await fetch(base + `/tickets/${id}/start`, { method: 'POST', headers: { Authorization: `Bearer ${worker}` } });
     await response.text(); return response.status;
   }));
   assert.deepEqual(starts.sort(), [200, 409], 'concurrent start requests must not both commit');
+  await call(`/tickets/${id}`, { token: reporter, method: 'DELETE', expected: 409 });
   for (const status of starts) evidence.push({ method: 'POST', path: `/tickets/${id}/start`, status, expected: status });
   await call(`/tickets/${id}/start`, { token: worker, method: 'POST', expected: 409 });
   await call(`/tickets/${id}/resolve`, { token: worker, method: 'POST', expected: 400 });
@@ -115,4 +119,4 @@ async function main() {
   writeFileSync('test-results/e2e.json', JSON.stringify({ run, passed: evidence.length, evidence }, null, 2));
   console.log(`PASS: ${evidence.length} API assertions; evidence saved in test-results/e2e.json`);
 }
-if (process.argv[1]?.endsWith('e2e.mjs')) main().catch(error => { console.error(error); process.exitCode = 1; });
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error => { console.error(error); process.exitCode = 1; });

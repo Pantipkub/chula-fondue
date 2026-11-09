@@ -8,6 +8,11 @@ import { TicketsService } from './tickets.service.js';
 export class TicketsController {
   constructor(private readonly tickets: TicketsService) {}
 
+  @GrpcMethod('TicketService', 'RetryRouting')
+  retryRouting(req: { id: string }, metadata: Metadata) {
+    return withRequestContext(metadata, 'RetryRouting', () => this.tickets.retryRouting(req.id));
+  }
+
   @GrpcMethod('TicketService', 'CreateTicket')
   createTicket(req: Parameters<TicketsService['create']>[0], metadata: Metadata) {
     return withRequestContext(metadata, 'CreateTicket', () => this.tickets.create(req));

@@ -1,5 +1,7 @@
 # Verification — 5 November 2026
 
+For the category auto-routing implementation added on 8 November, see [auto-routing verification](auto-routing-verification.md). The results below are the earlier platform snapshot.
+
 Verified locally against the isolated `fondue-demo` Docker Compose project. The existing `.env` and shared databases were not used.
 
 | Check | Result |
