@@ -1,6 +1,6 @@
 %%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, Arial, sans-serif","fontSize":"16px","primaryColor":"#DCEEFF","primaryTextColor":"#17324D","primaryBorderColor":"#4B8CCB","lineColor":"#526777","secondaryColor":"#EEF4F8","tertiaryColor":"#FFFFFF","clusterBkg":"#F5F9FC","clusterBorder":"#9BB9D0"},"flowchart":{"curve":"basis","nodeSpacing":55,"rankSpacing":75,"htmlLabels":true}}}%%
 flowchart LR
-  reporter["Campus Reporter<br/><small>Reporter · Guest</small>"]
+  reporter["Campus Reporter<br/><small>Signed-in reporter</small>"]
   staff["University Staff<br/><small>Admin · Department Staff</small>"]
 
   subgraph system["CHULA FONDUE · Campus issue reporting and repair"]
@@ -14,7 +14,7 @@ flowchart LR
   reporter -->|Report · track · cancel| app
   staff -->|Assign · resolve · manage| app
   app -.->|Optional photo upload · HTTPS| cloud
-  app -.->|Optional email delivery · HTTPS| gmail
+  app -.->|Optional ticket and recovery email · HTTPS| gmail
 
   subgraph legend["LEGEND"]
     direction LR

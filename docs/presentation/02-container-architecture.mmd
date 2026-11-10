@@ -1,55 +1,57 @@
-%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, Arial, sans-serif","fontSize":"15px","primaryColor":"#E7F2FB","primaryTextColor":"#17324D","primaryBorderColor":"#5798D0","lineColor":"#526777","secondaryColor":"#F0F5F8","tertiaryColor":"#FFFFFF","clusterBkg":"#F6F9FB","clusterBorder":"#9BB9D0"},"flowchart":{"curve":"basis","nodeSpacing":38,"rankSpacing":62,"htmlLabels":true}}}%%
-flowchart TB
-  users["Campus Users<br/><small>Reporter · Guest · Admin · Staff</small>"]
-  web["Web Frontend<br/><small>React + TypeScript · nginx</small>"]
-  gateway["API Gateway<br/><small>NestJS · REST/JSON · JWT/RBAC</small>"]
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#E7F2FB","primaryTextColor":"#17324D","primaryBorderColor":"#5798D0","lineColor":"#526777","secondaryColor":"#F0F5F8","tertiaryColor":"#FFFFFF","clusterBkg":"#F6F9FB","clusterBorder":"#9BB9D0"},"flowchart":{"curve":"basis","nodeSpacing":48,"rankSpacing":58}}}%%
+flowchart LR
+  users["Campus Users<br/>Reporter · Admin · Staff"]
+  cloud["Cloudinary<br/>Optional photo storage"]
+  gmail["Gmail API<br/>Optional outbound email"]
 
-  subgraph deploy["CHULA FONDUE · DOCKER COMPOSE NETWORK"]
+  subgraph deploy["CHULA FONDUE SYSTEM"]
     direction TB
-    subgraph services["APPLICATION CONTAINERS"]
+    subgraph entry["WEB ENTRY"]
       direction LR
-      auth["Auth Service<br/><small>NestJS · accounts / JWT</small>"]
-      dept["Department Service<br/><small>NestJS · departments / rules</small>"]
-      ticket["Ticket Service<br/><small>NestJS · gRPC :50051</small>"]
-      notify["Notification Service<br/><small>NestJS · RabbitMQ consumer</small>"]
-      analytics["Analytics Service<br/><small>NestJS · event projection</small>"]
+      web["Web Frontend<br/>React · nginx"]
+      gateway["API Gateway<br/>NestJS · JWT / RBAC"]
+      web -->|REST/JSON · /api| gateway
+    end
+
+    subgraph services["APPLICATION SERVICES"]
+      direction LR
+      auth["Auth Service<br/>accounts · sessions"]
+      dept["Department Service<br/>departments · routing rules"]
+      ticket["Ticket Service<br/>gRPC :50051"]
+      notify["Notification Service<br/>RabbitMQ · email"]
+      analytics["Analytics Service<br/>event projection"]
     end
 
     subgraph data["DATA & MESSAGING"]
       direction LR
-      subgraph pg["PostgreSQL 18 · one container, separate logical databases"]
+      subgraph pg["PostgreSQL 18 · separate logical databases"]
         direction TB
-        authdb[(auth database)]
-        deptdb[(department database)]
-        ticketdb[(ticket · history · outbox)]
-        analyticsdb[(analytics database)]
+        authdb[("auth · users · reset mail")]
+        deptdb[(department)]
+        ticketdb[("ticket · history · outbox · routing jobs")]
+        analyticsdb[(analytics)]
       end
-      rabbit[("RabbitMQ<br/><small>Durable notifications / analytics queues</small>")]
-      mongo[("MongoDB<br/><small>Notification inbox</small>")]
-      uploads[("Uploads volume<br/><small>Local photo fallback</small>")]
+      rabbit[("RabbitMQ<br/>Durable notification / analytics queues")]
+      mongo[("MongoDB<br/>Notification inbox")]
+      uploads[("Uploads volume<br/>Local photo fallback")]
     end
   end
-  cloud["Cloudinary<br/><small>Optional HTTPS photo store</small>"]
 
-  users -->|HTTPS| web
-  web -->|REST/JSON · /api| gateway
-  gateway -->|REST| auth
+  users -->|Uses via browser| web
+  gateway -->|REST · auth / session| auth
   gateway -->|REST| dept
   gateway -->|gRPC| ticket
-  gateway -->|REST| notify
-  gateway -->|REST| analytics
-
-  auth --> authdb
-  dept --> deptdb
-  ticket --> ticketdb
-  analytics --> analyticsdb
+  gateway -->|REST · inbox| notify
+  gateway -->|REST · admin reports| analytics
+  ticket -->|REST · department lookup / auto-routing| dept
   ticket -->|Transactional outbox · persistent event| rabbit
-  rabbit -->|At least once · notifications queue| notify
-  rabbit -->|At least once · analytics queue| analytics
-  notify -->|Upsert · deduplicate by eventId| mongo
-  gateway -->|Fallback photo storage| uploads
-  gateway -.->|Optional photo upload · HTTPS| cloud
-  uploads --> lperson
+  rabbit -->|At least once · notifications| notify
+  rabbit -->|At least once · analytics| analytics
+  notify -->|Upsert · eventId deduplication| mongo
+  auth -->|Internal REST · reset email| notify
+  notify -.->|Optional HTTPS · Gmail API| gmail
+  gateway -->|Photo fallback| uploads
+  gateway -.->|Optional HTTPS upload| cloud
 
   subgraph legend["LEGEND"]
     direction LR
@@ -68,12 +70,11 @@ flowchart TB
   class users,lperson person
   class web,gateway,auth,dept,ticket,notify,analytics,lcontainer container
   class authdb,deptdb,ticketdb,analyticsdb,rabbit,mongo,uploads,lstore store
-  class cloud,lexternal external
+  class cloud,gmail,lexternal external
   class lasync async
-  style deploy fill:#F7FAFC,stroke:#8EABBf,stroke-width:2px
+  style deploy fill:#F7FAFC,stroke:#8EABBF,stroke-width:2px
+  style entry fill:#FFFFFF,stroke:#B7CAD8,stroke-width:1px
   style services fill:#FFFFFF,stroke:#B7CAD8,stroke-width:1px
   style data fill:#FFFFFF,stroke:#B7CAD8,stroke-width:1px
   style pg fill:#F1F4F6,stroke:#8797A2,stroke-width:1.5px
   style legend fill:#FFFFFF,stroke:#B9C9D5,stroke-dasharray:4 3
-  linkStyle 12,13 stroke:#D87645,stroke-width:3px
-  linkStyle 17 stroke:transparent,stroke-width:0px,opacity:0

@@ -13,7 +13,7 @@ sequenceDiagram
   TS->>PG: Load ticket and history
   PG-->>TS: Ticket with department and version
   TS-->>GW: Ticket data
-  Note over GW: Allow only assigned department staff or admin
+  Note over GW: Allow active staff in the assigned department
   GW->>TS: gRPC StartProgress with expected version
   TS->>PG: Transaction sets IN_PROGRESS and writes history plus outbox
   PG-->>TS: Commit successful

@@ -9,20 +9,35 @@ sequenceDiagram
   participant Auto as Auto Routing Worker
   participant Dept as Department Service
 
-  Reporter->>GW: POST /tickets with category location description and photos
-  Note over GW: Check reporter role and required fields
-  opt Photos attached
-    GW->>Photos: Store photos in Cloudinary or local uploads volume
-    Photos-->>GW: Photo URLs
+  Reporter->>GW: POST /tickets with report fields and optional Idempotency-Key
+  Note over GW: Require signed-in reporter and validate required fields
+  alt Matching submission already exists
+    GW->>TS: gRPC FindSubmission with reporter id and content fingerprint
+    TS->>PG: Look up reporter id and submission key
+    PG-->>TS: Matching ticket and fingerprint
+    TS-->>GW: Return the existing ticket
+    GW-->>Reporter: Return prior result without creating a duplicate
+  else New submission or no matching key
+    opt Idempotency-Key supplied
+      GW->>TS: gRPC FindSubmission with reporter id and content fingerprint
+      TS->>PG: Look up reporter id and submission key
+      PG-->>TS: No matching submission
+      TS-->>GW: Continue with new ticket
+    end
+    Note over GW,TS: Reusing a key with different content returns 409
+    opt Photos attached
+      GW->>Photos: Store photos in Cloudinary or local uploads volume
+      Photos-->>GW: Photo URLs
+    end
+    GW->>TS: gRPC CreateTicket with reporter identity key and fingerprint
+    TS->>PG: Begin transaction and write SUBMITTED ticket history and outbox
+    opt Automatic routing enabled
+      TS->>PG: Also create PENDING routing job
+    end
+    PG-->>TS: Commit successful
+    TS-->>GW: Ticket id and SUBMITTED status
+    GW-->>Reporter: 201 ticket created
   end
-  GW->>TS: gRPC CreateTicket with reporter identity and photo URLs
-  TS->>PG: Transaction creates SUBMITTED ticket and history plus outbox
-  opt Automatic routing enabled
-    TS->>PG: Create PENDING routing job in same transaction
-  end
-  PG-->>TS: Commit successful
-  TS-->>GW: Ticket id and SUBMITTED status
-  GW-->>Reporter: 201 ticket created
 
   opt Automatic routing enabled
     Note over Auto,PG: Worker polls every 2 s and leases a due job
@@ -31,8 +46,7 @@ sequenceDiagram
     Auto->>Dept: POST /routing-rules/match with category and 3 s timeout
     alt Exactly one enabled rule matches
       Dept-->>Auto: MATCHED with department and rule id
-      Auto->>PG: Transaction sets ASSIGNED and writes history plus outbox
-      Auto->>PG: Mark routing job DONE
+      Auto->>PG: Atomic update ASSIGNED plus history outbox and job DONE
       PG-->>Auto: Commit successful
     else No rule or ambiguous rules
       Dept-->>Auto: NO_RULE or AMBIGUOUS_RULES

@@ -7,6 +7,8 @@ sequenceDiagram
   participant MQ as RabbitMQ
   participant NS as Notification Service
   participant Mongo as MongoDB
+  participant Mail as Email Worker
+  participant Gmail as Gmail API
   participant AS as Analytics Service
 
   Note over TS,PG: Ticket transaction committed
@@ -14,13 +16,22 @@ sequenceDiagram
     Worker->>PG: Poll pending outbox rows
     PG-->>Worker: eventId and payload
   end
-  Worker->>MQ: Publish persistent ticket.status_changed event
+  Worker->>MQ: Publish persistent event to notifications queue
+  MQ-->>Worker: Publisher confirm
+  Worker->>MQ: Publish persistent event to analytics queue
   MQ-->>Worker: Publisher confirm
   par Notification delivery at least once
     MQ->>NS: Deliver notification queue event
     NS->>Mongo: Upsert notification by eventId
     Mongo-->>NS: Stored or already exists
     NS-->>MQ: ACK after MongoDB write
+    opt EMAIL_MODE is gmail
+      Mail->>Mongo: Lease pending email record
+      Mongo-->>Mail: Notification and recipient
+      Mail->>Gmail: Send message over HTTPS with OAuth2
+      Gmail-->>Mail: Gmail message id
+      Mail->>Mongo: Mark delivery SENT or schedule retry
+    end
   and Analytics delivery at least once
     MQ->>AS: Deliver analytics queue event
     AS->>PG: Write analytics PostgreSQL projection

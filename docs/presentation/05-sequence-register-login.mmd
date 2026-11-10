@@ -21,8 +21,8 @@ sequenceDiagram
     GW->>Auth: Forward login request over REST
     Auth->>DB: Find user by normalized email
     DB-->>Auth: User and password hash
-    Note over Auth: Verify password with scrypt and timing safe comparison
-    Auth-->>GW: HS256 access token and user profile
-    GW-->>Reporter: 201 access token and profile
+    Note over Auth: Require active account and verify password with scrypt
+    Auth-->>GW: HS256 access token with tokenVersion and user profile
+    GW-->>Reporter: 200 access token and profile
     Note over Auth: Invalid email or password returns the same 401 response
   end
