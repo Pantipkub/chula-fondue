@@ -14,12 +14,12 @@ function useMobileMenu() {
   const toggle = useRef<HTMLButtonElement>(null);
   useEffect(() => { setOpen(false); }, [location.pathname, location.search]);
   useEffect(() => {
-    if (!open) return;
+    if (!open) { return; }
     const close = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { setOpen(false); toggle.current?.focus(); }
     };
-    window.addEventListener('keydown', close);
-    return () => window.removeEventListener('keydown', close);
+    globalThis.addEventListener('keydown', close);
+    return () => globalThis.removeEventListener('keydown', close);
   }, [open]);
   return { open, setOpen, toggle };
 }
@@ -77,11 +77,11 @@ export function PublicLayout() {
 }
 
 /** Sends people who are not signed in with one of `roles` to the login page. */
-export function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }) {
+export function RequireRole({ roles, children }: Readonly<{ roles: Role[]; children: ReactNode }>) {
   const { session } = useAuth();
   const loc = useLocation();
-  if (!session || session.role === 'GUEST') return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
-  if (!roles.includes(session.role)) return <Navigate to={homeFor(session.role)} replace />;
+  if (!session || session.role === 'GUEST') { return <Navigate to="/login" replace state={{ from: loc.pathname }} />; }
+  if (!roles.includes(session.role)) { return <Navigate to={homeFor(session.role)} replace />; }
   return <>{children}</>;
 }
 
@@ -91,7 +91,7 @@ const MENUS: Record<'ADMIN' | 'STAFF', [string, string, string][]> = {
 };
 
 /** Sidebar layout for Admin and Staff. `counts` adds a small number next to a menu item. */
-export function AppShell({ role, counts = {}, search }: { role: 'ADMIN' | 'STAFF'; counts?: Record<string, number>; search?: ReactNode }) {
+export function AppShell({ role, counts = {}, search }: Readonly<{ role: 'ADMIN' | 'STAFF'; counts?: Record<string, number>; search?: ReactNode }>) {
   const { session, logout } = useAuth();
   const nav = useNavigate();
   const mobile = useMobileMenu();

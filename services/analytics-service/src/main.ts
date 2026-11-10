@@ -6,6 +6,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Column, DataSource, Entity, PrimaryColumn } from 'typeorm';
 import { aggregate, TicketMetric } from './analytics.js';
 
+const databaseUrl = process.env.ANALYTICS_DATABASE_URL;
+if (!databaseUrl?.trim()) throw new Error('ANALYTICS_DATABASE_URL is required');
+
 @Entity()
 class Metric {
   @PrimaryColumn('uuid') ticketId: string;
@@ -19,9 +22,9 @@ class AnalyticsController {
   @Get('health/ready') async ready() { await this.db.query('SELECT 1'); return { status: 'ready' }; }
   @Get('analytics') async report(@Query() query: Record<string, string>) {
     for (const key of ['from', 'to']) {
-      if (query[key] && (!/^\d{4}-\d{2}-\d{2}$/.test(query[key]) || !Number.isFinite(Date.parse(query[key])))) throw new BadRequestException(`${key} must be YYYY-MM-DD`);
+      if (query[key] && (!/^\d{4}-\d{2}-\d{2}$/.test(query[key]) || !Number.isFinite(Date.parse(query[key])))) { throw new BadRequestException(`${key} must be YYYY-MM-DD`); }
     }
-    if (query.from && query.to && query.from > query.to) throw new BadRequestException('from must not be after to');
+    if (query.from && query.to && query.from > query.to) { throw new BadRequestException('from must not be after to'); }
     const rows = (await this.db.getRepository(Metric).find()).map(r => r.data).filter(r =>
       (!query.from || r.createdAt.slice(0, 10) >= query.from) && (!query.to || r.createdAt.slice(0, 10) <= query.to) &&
       (!query.category || r.category === query.category) && (!query.departmentId || r.departmentId === query.departmentId));
@@ -41,7 +44,7 @@ class AnalyticsController {
     } catch { setTimeout(() => { try { channel.nack(message, false, true); } catch {} }, 5000); }
   }
 }
-@Module({ imports: [TypeOrmModule.forRoot({ type: 'postgres', url: process.env.ANALYTICS_DATABASE_URL ?? 'postgresql://fondue:fondue@localhost:5433/analytics', entities: [Metric], synchronize: true, retryAttempts: 20 })], controllers: [AnalyticsController] })
+@Module({ imports: [TypeOrmModule.forRoot({ type: 'postgres', url: databaseUrl, entities: [Metric], synchronize: true, retryAttempts: 20 })], controllers: [AnalyticsController] })
 class AppModule {}
 const app = await NestFactory.create(AppModule);
 app.connectMicroservice<MicroserviceOptions>({ transport: Transport.RMQ, options: {

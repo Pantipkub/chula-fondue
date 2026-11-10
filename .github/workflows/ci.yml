@@ -16,15 +16,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
+      - run: npm run test:coverage
       - run: npm run setup:demo
       - run: docker compose --env-file .env.demo -p fondue-demo up -d --build --wait --wait-timeout 180
-      - run: node --test tests/routing.integration.test.mjs
+      - run: npm run test:coverage:integration
         env:
           ROUTING_TEST_DATABASE_URL: postgresql://fondue:fondue@127.0.0.1:5435/ticket
       - run: npm run test:e2e
-      - run: npm run test:platform
-      - run: npm run test:platform:e2e
+      - run: node --env-file-if-exists=.env.demo tests/platform-e2e.mjs
       - run: npm run test:recovery
       - run: npm run seed:demo
       - run: npm run test:routing
@@ -34,15 +33,23 @@ jobs:
         env:
           WEB_URL: http://127.0.0.1:8080
           BROWSER_CHANNEL: chromium
+      - run: npm run test:ui:sonar
+        env:
+          WEB_URL: http://127.0.0.1:8080
+          BROWSER_CHANNEL: chromium
+      - run: npm run test:ui:queue
+        env:
+          WEB_URL: http://127.0.0.1:8080
+          BROWSER_CHANNEL: chromium
       - run: npm run test:ui:live
         env:
           WEB_URL: http://127.0.0.1:8080
           BROWSER_CHANNEL: chromium
-      - run: npm run test:platform:ui
+      - run: node --env-file-if-exists=.env.demo tests/platform-ui.mjs
         env:
           WEB_URL: http://127.0.0.1:8080
           BROWSER_CHANNEL: chromium
-      - run: npm run test:ui:auth-tabs
+      - run: node tests/ui-auth-tabs.mjs
         env:
           WEB_URL: http://127.0.0.1:8080
           BROWSER_CHANNEL: chromium
@@ -56,4 +63,6 @@ jobs:
         if: always()
         with:
           name: verification-evidence
-          path: test-results/
+          path: |
+            test-results/
+            coverage/

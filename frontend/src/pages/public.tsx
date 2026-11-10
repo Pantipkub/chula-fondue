@@ -73,7 +73,7 @@ export function Landing() {
 }
 
 // ---------------------------------------------------------------- auth
-export function AuthFrame({ title, sub, aside, children }: { title: string; sub: string; aside?: React.ReactNode; children: React.ReactNode }) {
+export function AuthFrame({ title, sub, aside, children }: Readonly<{ title: string; sub: string; aside?: React.ReactNode; children: React.ReactNode }>) {
   return (
     <div className="auth">
       <div className="brand">
@@ -101,14 +101,14 @@ export function Login() {
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setErr('');
     try { const s = await login(email, password); nav(loc.state?.from && s.role !== 'GUEST' ? loc.state.from : homeFor(s.role), { replace: true }); }
-    catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
+    catch (error_) { setErr((error_ as Error).message); } finally { setBusy(false); }
   };
   return (
     <AuthFrame title={'แจ้งซ่อมออนไลน์\nติดตามสถานะได้ทันที'} sub="ดูรายการแจ้งซ่อม ตรวจรับงาน หรือส่งกลับให้แก้ไข">
       <form onSubmit={submit} className="stack" style={{ width: 'min(440px, 100%)', ['--gap' as string]: '20px' }}>
         <div className="stack" style={{ ['--gap' as string]: '4px' }}><h1>เข้าสู่ระบบ</h1><p className="muted small">ใช้อีเมลที่ลงทะเบียนไว้</p></div>
         {loc.state?.registered && <Note tone="sage" icon="check">ลงทะเบียนแล้ว กรุณาเข้าสู่ระบบ</Note>}
-        {sessionNotice === 'replaced' && <div role="status"><Note>ออกจากระบบแล้ว เนื่องจากมีการเข้าสู่ระบบในแท็บอื่น กรุณาเข้าสู่ระบบอีกครั้ง</Note></div>}
+      {sessionNotice === 'replaced' && <output><Note>ออกจากระบบแล้ว เนื่องจากมีการเข้าสู่ระบบในแท็บอื่น กรุณาเข้าสู่ระบบอีกครั้ง</Note></output>}
         <ErrorBox error={err} />
         <Input id="email" label="อีเมล" icon="mail" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@chula.ac.th" />
         <div className="stack" style={{ ['--gap' as string]: '8px' }}>
@@ -117,7 +117,7 @@ export function Login() {
         </div>
         <Button block busy={busy} type="submit">เข้าสู่ระบบ</Button>
         <div className="row"><hr className="divider" /><span className="small muted">หรือ</span><hr className="divider" /></div>
-        <Button kind="outline" icon="user" block type="button" onClick={async () => { if (!session) await ensureToken(); nav('/report'); }}>เข้าใช้งานแบบผู้เยี่ยมชม</Button>
+        <Button kind="outline" icon="user" block type="button" onClick={async () => { if (!session) { await ensureToken(); } nav('/report'); }}>เข้าใช้งานแบบผู้เยี่ยมชม</Button>
         <p className="center small muted">ยังไม่มีบัญชี <Link to="/register" className="strong">ลงทะเบียน</Link></p>
         <p className="center xs muted">เจ้าหน้าที่ใช้บัญชีที่ผู้ดูแลระบบสร้างให้</p>
       </form>
@@ -133,11 +133,11 @@ export function Register() {
   const mismatch = f.confirm.length > 0 && f.confirm !== f.password;
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (f.password.length < 8) return setErr('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
-    if (mismatch) return;
+    if (f.password.length < 8) { return setErr('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'); }
+    if (mismatch) { return; }
     setBusy(true); setErr('');
     try { await Api.register(f.email, f.password); nav('/login', { state: { registered: f.email } }); }
-    catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
+    catch (error_) { setErr((error_ as Error).message); } finally { setBusy(false); }
   };
   const rule = (ok: boolean, t: string) => <span className="row xs" style={{ ['--gap' as string]: '6px', color: ok ? 'var(--sage-800)' : 'var(--ink-600)' }}><Icon name={ok ? 'check' : 'x'} size={14} />{t}</span>;
   return (
@@ -158,7 +158,7 @@ export function Register() {
 }
 
 // ---------------------------------------------------------------- track (guest-friendly)
-export function TicketSummary({ ticket, history, children }: { ticket: Ticket; history: HistoryEntry[]; children?: React.ReactNode }) {
+export function TicketSummary({ ticket, history, children }: Readonly<{ ticket: Ticket; history: HistoryEntry[]; children?: React.ReactNode }>) {
   const c = categoryOf(ticket.category);
   return (
     <div className="card lg stack" style={{ ['--gap' as string]: '20px' }}>
@@ -194,9 +194,9 @@ export function Track() {
   const { ensureToken, session } = useAuth();
   const [q, setQ] = useState(param ?? '');
   const valid = !!param && UUID_RE.test(param);
-  const load = useLoad(async () => { if (!valid) return null; await ensureToken(); return Api.history(param!); }, [param], (result) => !!result && isRoutingPending(result.ticket));
+  const load = useLoad(async () => { if (!valid) { return null; } await ensureToken(); return Api.history(param); }, [param], (result) => !!result && isRoutingPending(result.ticket));
   const recent = recentTickets.list();
-  const submit = (e: FormEvent) => { e.preventDefault(); const v = q.trim(); if (v) nav(`/track/${v}`); };
+  const submit = (e: FormEvent) => { e.preventDefault(); const v = q.trim(); if (v) { nav(`/track/${v}`); } };
   return (
     <div className="page narrow">
       <div className="stack center" style={{ ['--gap' as string]: '8px', alignItems: 'center' }}><Bubble icon="search" size={56} iconSize={26} /><h1>ติดตามสถานะ</h1><p className="muted">ใช้บัญชีหรือเบราว์เซอร์เดียวกับตอนแจ้งซ่อม</p></div>

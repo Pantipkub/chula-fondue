@@ -6,12 +6,12 @@ import { AuthMail, PasswordReset } from './password-reset.entity.js';
 export class AuthMailService implements OnModuleInit, OnModuleDestroy {
   private timer?: ReturnType<typeof setInterval>;
   private busy = false;
-  private logger = new Logger('AuthMail');
+  private readonly logger = new Logger('AuthMail');
   constructor(private readonly db: DataSource) {}
   onModuleInit() { this.timer = setInterval(() => void this.tick(), 2000); }
-  onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
+  onModuleDestroy() { if (this.timer) { clearInterval(this.timer); } }
   async tick() {
-    if (this.busy) return;
+    if (this.busy) { return; }
     this.busy = true;
     try {
       await this.db.transaction(async manager => {
@@ -19,12 +19,12 @@ export class AuthMailService implements OnModuleInit, OnModuleDestroy {
         await manager.delete(AuthMail, { expiresAt: LessThanOrEqual(now) });
         await manager.delete(PasswordReset, { expiresAt: LessThanOrEqual(now) });
         const mail = await manager.findOne(AuthMail, { where: { nextAttemptAt: LessThanOrEqual(now) }, order: { nextAttemptAt: 'ASC' }, lock: { mode: 'pessimistic_write', onLocked: 'skip_locked' } });
-        if (!mail) return;
+        if (!mail) { return; }
         try {
           const response = await fetch(`${process.env.NOTIFICATION_SERVICE_URL ?? 'http://localhost:8082'}/internal/password-reset`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mail), signal: AbortSignal.timeout(3000),
           });
-          if (!response.ok) throw new Error('Notification Service unavailable');
+          if (!response.ok) { throw new Error('Notification Service unavailable'); }
           await manager.delete(AuthMail, { eventId: mail.eventId });
         } catch {
           mail.attempts++;

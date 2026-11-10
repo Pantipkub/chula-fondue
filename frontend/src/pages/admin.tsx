@@ -8,7 +8,7 @@ import { RoutingNotice } from '../components/routing';
 import { RoutingRules } from '../components/routing-rules';
 import { Badge, Bubble, Button, Drawer, Empty, ErrorBox, Gallery, Icon, IconButton, Input, Meta, Modal, Note, PasswordInput, Photo, Select, Skeleton, Textarea, Timeline, VSteps, useLoad, useToast } from '../components/ui';
 import { AppShell, Crumb, PageHead } from '../components/layouts';
-import { KV, Kpi } from './reporter';
+import { KeyValue, Kpi } from './reporter';
 
 export function AdminFrame() {
   const loc = useLocation();
@@ -31,7 +31,7 @@ export function Inbox() {
   const n = (s: Status[]) => tickets.filter((t) => s.includes(t.status)).length;
   const pending = tickets.filter(isRoutingPending).length;
   const review = tickets.filter((t) => t.status === 'SUBMITTED' && !isRoutingPending(t)).length;
-  const rows = useMemo(() => tickets.filter((t) => (!ATABS[tab][1] || ATABS[tab][1]!.includes(t.status)) && (!dept || t.departmentId === dept) && (!q || `${t.id} ${t.location} ${t.description} ${t.reporterEmail}`.toLowerCase().includes(q.toLowerCase()))), [tickets, tab, dept, q]);
+  const rows = useMemo(() => tickets.filter((t) => (!ATABS[tab][1] || ATABS[tab][1].includes(t.status)) && (!dept || t.departmentId === dept) && (!q || `${t.id} ${t.location} ${t.description} ${t.reporterEmail}`.toLowerCase().includes(q.toLowerCase()))), [tickets, tab, dept, q]);
   return (
     <>
       <PageHead title="งานแจ้งซ่อม" sub="รับเรื่องและส่งต่อหน่วยงานที่รับผิดชอบ"><IconButton icon="refresh" label="รีเฟรช" onClick={load.reload} busy={load.loading} /></PageHead>
@@ -48,7 +48,7 @@ export function Inbox() {
           <div><Select id="dept" icon="filter" value={dept} onChange={(e) => setDept(e.target.value)} aria-label="หน่วยงาน"><option value="">ทุกหน่วยงาน</option>{depts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</Select></div></div>
       </div>
       <ErrorBox error={load.error} />
-      {load.loading && !load.data ? <Skeleton h={400} /> : rows.length === 0 ? <div className="card"><Empty title="ไม่มีงานในสถานะนี้" icon="inbox">{tab === 1 && <span className="small">รับเรื่องครบทุกงานแล้ว</span>}</Empty></div> : (
+      {(load.loading && !load.data) && (<Skeleton h={400} />)}{!(load.loading && !load.data) && (rows.length === 0 ? <div className="card"><Empty title="ไม่มีงานในสถานะนี้" icon="inbox">{tab === 1 && <span className="small">รับเรื่องครบทุกงานแล้ว</span>}</Empty></div> : (
         <div className="table">
           <table>
             <thead><tr><th>งานซ่อม</th><th>สถานที่</th><th>ผู้แจ้ง</th><th>หน่วยงาน</th><th>สถานะ</th><th>แจ้งเมื่อ</th><th aria-label="เปิด" /></tr></thead>
@@ -68,7 +68,7 @@ export function Inbox() {
             })}</tbody>
           </table>
         </div>
-      )}
+      ))}
     </>
   );
 }
@@ -84,14 +84,14 @@ export function Review() {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  if (load.loading && !load.data) return <><Skeleton h={60} /><Skeleton h={420} /></>;
-  if (!load.data) return <ErrorBox error={load.error ?? 'ไม่พบรายการนี้'} />;
+  if (load.loading && !load.data) { return <><Skeleton h={60} /><Skeleton h={420} /></>; }
+  if (!load.data) { return <ErrorBox error={load.error ?? 'ไม่พบรายการนี้'} />; }
   const [{ ticket: t, history }, depts] = load.data;
   const c = categoryOf(t.category);
   const chosen = dept;
   const act = async (fn: () => Promise<unknown>, msg: string) => {
     setBusy(true); setErr('');
-    try { await fn(); toast(msg); setRejectOpen(false); setDept(''); load.reload(); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
+    try { await fn(); toast(msg); setRejectOpen(false); setDept(''); load.reload(); } catch (error_) { setErr((error_ as Error).message); } finally { setBusy(false); }
   };
   const deptName = (d: string) => depts.find((x) => x.id === d)?.name ?? '';
   return (
@@ -103,7 +103,7 @@ export function Review() {
         <div className="stack" style={{ ['--gap' as string]: '24px' }}>
           <Gallery urls={t.photoUrls} />
           <div className="card lg stack"><h3>รายละเอียด</h3><p style={{ lineHeight: 1.7 }}>{t.description}</p><hr className="divider" />
-            <div className="two"><KV icon={c.icon} k="หมวด" v={c.label} /><KV icon="pin" k="สถานที่" v={t.location} /><KV icon="calendar" k="แจ้งเมื่อ" v={fmtDate(t.createdAt)} /><KV icon="mail" k="ผู้แจ้ง" v={t.reporterEmail} /></div>
+            <div className="two"><KeyValue icon={c.icon} k="หมวด" v={c.label} /><KeyValue icon="pin" k="สถานที่" v={t.location} /><KeyValue icon="calendar" k="แจ้งเมื่อ" v={fmtDate(t.createdAt)} /><KeyValue icon="mail" k="ผู้แจ้ง" v={t.reporterEmail} /></div>
           </div>
           {t.completionPhotoUrls.length > 0 && <div className="card stack"><h3>รูปหลังซ่อม</h3><div className="thumbs-row">{t.completionPhotoUrls.map((u, i) => <a key={u} href={u} target="_blank" rel="noreferrer" style={{ width: 160 }}><Photo src={u} tone={i + 2} /></a>)}</div></div>}
         </div>
@@ -168,13 +168,13 @@ export function Departments() {
   const [depts, tickets] = load.data ?? [[], []];
   const open = (d: string) => tickets.filter((t) => t.departmentId === d && ['ASSIGNED', 'IN_PROGRESS', 'RESOLVED'].includes(t.status)).length;
   const save = async (e: FormEvent) => {
-    e.preventDefault(); if (!edit) return;
+    e.preventDefault(); if (!edit) { return; }
     setBusy(true); setErr('');
     const body = { name: edit.name?.trim() ?? '', contactEmail: edit.contactEmail?.trim() ?? '', buildings: edit.buildings ?? [] };
-    try { if (edit.id) await Api.updateDepartment(edit.id, body); else await Api.createDepartment(body); toast(edit.id ? 'บันทึกหน่วยงานแล้ว' : 'เพิ่มหน่วยงานแล้ว'); setEdit(null); load.reload(); }
-    catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
+    try { if (edit.id) { await Api.updateDepartment(edit.id, body); } else { await Api.createDepartment(body); } toast(edit.id ? 'บันทึกหน่วยงานแล้ว' : 'เพิ่มหน่วยงานแล้ว'); setEdit(null); load.reload(); }
+    catch (error_) { setErr((error_ as Error).message); } finally { setBusy(false); }
   };
-  const addBuilding = () => { const b = newB.trim(); if (b && edit && !edit.buildings?.includes(b)) setEdit({ ...edit, buildings: [...(edit.buildings ?? []), b] }); setNewB(''); };
+  const addBuilding = () => { const b = newB.trim(); if (b && edit && !edit.buildings?.includes(b)) { setEdit({ ...edit, buildings: [...(edit.buildings ?? []), b] }); } setNewB(''); };
   return (
     <>
       <PageHead title="หน่วยงาน" sub="หน่วยงานรับงานซ่อม และการส่งต่องานตามหมวด"><Button icon="plus" onClick={() => { setErr(''); setEdit({ name: '', contactEmail: '', buildings: [] }); }}>เพิ่มหน่วยงาน</Button></PageHead>
@@ -189,7 +189,7 @@ export function Departments() {
               <div className="row wrap" style={{ ['--gap' as string]: '6px' }}>{d.buildings.length ? d.buildings.map((b) => <span key={b} className="tag">{b}</span>) : <span className="xs muted">ยังไม่ระบุอาคาร</span>}</div>
               <hr className="divider" />
               <div className="row between"><span className="small muted">งานค้าง</span><span className="count" style={{ background: 'var(--pink-100)', color: 'var(--pink-800)' }}>{open(d.id)}</span></div>
-              {d.active === false && <Button kind="outline" busy={busy} onClick={async () => { setBusy(true); try { await Api.updateDepartment(d.id, { active: true }); toast('เปิดใช้งานหน่วยงานแล้ว'); load.reload(); } catch (x) { toast((x as Error).message, 'red'); } finally { setBusy(false); } }}>เปิดใช้งานอีกครั้ง</Button>}
+              {d.active === false && <Button kind="outline" busy={busy} onClick={async () => { setBusy(true); try { await Api.updateDepartment(d.id, { active: true }); toast('เปิดใช้งานหน่วยงานแล้ว'); load.reload(); } catch (error_) { toast((error_ as Error).message, 'red'); } finally { setBusy(false); } }}>เปิดใช้งานอีกครั้ง</Button>}
             </div>
           ))}
           <button className="card stack" style={{ ['--gap' as string]: '10px', alignItems: 'center', justifyContent: 'center', border: '1.5px dashed var(--pink-300)', background: 'var(--pink-50)', boxShadow: 'none', cursor: 'pointer', minHeight: 220 }} onClick={() => { setErr(''); setEdit({ name: '', contactEmail: '', buildings: [] }); }}>
@@ -221,7 +221,7 @@ export function Departments() {
         <div className="stack" style={{ ['--gap' as string]: '6px' }}><h2>ปิดใช้งาน “{del?.name}”</h2><p className="small muted">ประวัติงานเดิมยังเก็บไว้ แต่จะส่งต่องานให้หน่วยงานนี้ไม่ได้ ก่อนปิดใช้งาน กรุณาย้ายบัญชีเจ้าหน้าที่ เคลียร์งานค้าง และยกเลิกการส่งต่ออัตโนมัติของหน่วยงานนี้</p></div>
         {del && open(del.id) > 0 && <Note tone="red" icon="alert">ยังมีงานค้าง {open(del.id)} งาน</Note>}
         <ErrorBox error={err} />
-        <div className="two"><Button kind="outline" onClick={() => setDel(null)}>ยกเลิก</Button><Button kind="danger" icon="x" busy={busy} disabled={!!del && open(del.id) > 0} onClick={async () => { setBusy(true); setErr(''); try { await Api.deleteDepartment(del!.id); toast('ปิดใช้งานหน่วยงานแล้ว'); setDel(null); load.reload(); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); } }}>ปิดใช้งาน</Button></div>
+        <div className="two"><Button kind="outline" onClick={() => setDel(null)}>ยกเลิก</Button><Button kind="danger" icon="x" busy={busy} disabled={!!del && open(del.id) > 0} onClick={async () => { setBusy(true); setErr(''); try { await Api.deleteDepartment(del!.id); toast('ปิดใช้งานหน่วยงานแล้ว'); setDel(null); load.reload(); } catch (error_) { setErr((error_ as Error).message); } finally { setBusy(false); } }}>ปิดใช้งาน</Button></div>
       </Modal>
     </>
   );
@@ -238,12 +238,12 @@ export function Users() {
   const [editing, setEditing] = useState<{ user: PublicUser; role: 'REPORTER' | 'STAFF' | 'ADMIN'; departmentId: string; active: boolean } | null>(null);
   const [editError, setEditError] = useState('');
   const saveAccount = async (e: FormEvent) => {
-    e.preventDefault(); if (!editing) return;
+    e.preventDefault(); if (!editing) { return; }
     setBusy(true); setEditError('');
     try {
       await Api.updateUser(editing.user.id, { role: editing.role, active: editing.active, ...(editing.role === 'STAFF' ? { departmentId: editing.departmentId } : {}) });
       toast('บันทึกบัญชีแล้ว'); setEditing(null); accounts.reload();
-    } catch (x) { setEditError((x as Error).message); } finally { setBusy(false); }
+    } catch (error_) { setEditError((error_ as Error).message); } finally { setBusy(false); }
   };
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setErr('');
@@ -252,7 +252,7 @@ export function Users() {
       accounts.reload();
       toast(`สร้างบัญชี ${u.email} แล้ว`);
       setF({ ...f, email: '', password: '' });
-    } catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
+    } catch (error_) { setErr((error_ as Error).message); } finally { setBusy(false); }
   };
   const role = (icon: string, tone: string, name: string, caps: string[]) => (
     <div className="stack" style={{ ['--gap' as string]: '8px', padding: 16, borderRadius: 12, border: '1px solid var(--line-200)' }}>

@@ -136,8 +136,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .gallery .thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .gallery .thumbs button { padding: 0; border: 2px solid transparent; border-radius: var(--r); background: none; cursor: pointer; }
 .gallery .thumbs button.on { border-color: var(--pink-600); }
-.dropzone { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 24px; border-radius: var(--r-lg); border: 1.5px dashed var(--pink-300); background: var(--pink-50); text-align: center; cursor: pointer; transition: background-color .15s; }
+.dropzone { display: flex; width: 100%; color: inherit; flex-direction: column; align-items: center; gap: 8px; padding: 28px 24px; border-radius: var(--r-lg); border: 1.5px dashed var(--pink-300); background: var(--pink-50); text-align: center; cursor: pointer; transition: background-color .15s; }
 .dropzone:hover, .dropzone.drag { background: var(--pink-100); }
+output { display: block; }
 .thumbs-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .thumbs-row .photo { width: 132px; }
 
@@ -153,7 +154,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .vsteps { display: flex; flex-direction: column; }
 .vstep { display: flex; gap: 12px; }
 .vstep .dotcol { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.vstep .dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; border: 1.5px solid var(--line-300); background: #fff; color: #fff; }
+.vstep .dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; border: 1.5px solid var(--line-300); background: #fff; color: var(--ink-700); }
 .vstep .rail { width: 2px; height: 18px; background: var(--line-300); }
 .vstep:last-child .rail { display: none; }
 .vstep.done .dot { background: var(--sage-500); border-color: var(--sage-500); }
@@ -174,7 +175,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .hconn.done { background: var(--sage-500); }
 
 /* overlay */
+.overlay-dialog { position: fixed; inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; }
+.overlay-dialog::backdrop { background: transparent; }
 .scrim { position: fixed; inset: 0; background: rgba(58, 42, 45, 0.45); z-index: 50; display: grid; place-items: start center; padding: 120px 16px 16px; overflow-y: auto; animation: fade .15s ease-out; }
+.scrim-dismiss { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; cursor: default; }
+.scrim > .modal, .scrim > .drawer { position: relative; }
 .modal { width: min(540px, 100%); background: #fff; border-radius: var(--r-xl); padding: 28px; box-shadow: var(--shadow-lifted); display: flex; flex-direction: column; gap: 18px; animation: pop .18s ease-out; }
 .drawer-scrim { place-items: stretch end; padding: 0; }
 .drawer { width: min(480px, 100%); height: 100%; background: #fff; padding: 32px; display: flex; flex-direction: column; gap: 20px; box-shadow: var(--shadow-lifted); animation: slide .2s ease-out; overflow-y: auto; }
@@ -248,6 +253,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* ticket card + table */
 .tcard { display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: var(--r-lg); color: inherit; text-decoration: none !important; transition: border-color .15s, box-shadow .15s; }
 .tcard:hover { border-color: var(--pink-300); box-shadow: var(--shadow-lifted); }
+.tcard-main { display: flex; flex-direction: column; gap: 12px; color: inherit; text-decoration: none !important; }
 .tcard .photo { aspect-ratio: 16 / 9; }
 .tcard .body { display: flex; flex-direction: column; gap: 8px; padding: 0 4px 4px; }
 .meta { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-600); }

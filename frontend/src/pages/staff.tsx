@@ -5,7 +5,8 @@ import type { Ticket } from '../lib/api';
 import { ago, categoryOf, fmtDate, fmtShort, shortId } from '../lib/format';
 import { Badge, Bubble, Button, Empty, ErrorBox, Gallery, Icon, IconButton, Input, Note, Photo, PhotoPicker, Select, Skeleton, Timeline, useLoad, useToast } from '../components/ui';
 import { AppShell, Crumb, PageHead } from '../components/layouts';
-import { KV } from './reporter';
+import { KeyValue } from './reporter';
+import { emptyQueueCopy, filterQueue, queueCounts, queuePage, queueResultLabel, updateQueueParams } from '../lib/staff-queue';
 
 const QUEUE_STATUSES = [
   { value: 'ACTIVE', label: 'งานค้าง', icon: 'list', tone: 'pink' },
@@ -15,7 +16,6 @@ const QUEUE_STATUSES = [
   { value: 'CLOSED', label: 'ปิดงานแล้ว', icon: 'done', tone: 'gray' },
   { value: 'ALL', label: 'งานทั้งหมด', icon: 'ticket', tone: 'gray' },
 ];
-const ACTIVE_STATUSES = ['ASSIGNED', 'IN_PROGRESS', 'RESOLVED'];
 const NO_TICKETS: Ticket[] = [];
 const countLabel = (value: number) => value.toLocaleString('th-TH');
 
@@ -35,7 +35,7 @@ export function Queue() {
   const submitting = useRef(false);
   const previous = useRef<Ticket[]>();
   const resultsHeading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { if (load.data) previous.current = load.data; }, [load.data]);
+  useEffect(() => { if (load.data) { previous.current = load.data; } }, [load.data]);
   const all = load.data ?? previous.current ?? NO_TICKETS;
   const hasData = load.data !== undefined || previous.current !== undefined;
   const dept = all.find((t) => t.departmentName)?.departmentName;
@@ -43,42 +43,15 @@ export function Queue() {
   const category = params.get('category') ?? '';
   const status = QUEUE_STATUSES.some((item) => item.value === params.get('status')) ? params.get('status')! : 'ACTIVE';
   const sort = ['oldest', 'newest', 'updated'].includes(params.get('sort') ?? '') ? params.get('sort')! : 'oldest';
-  const size = [10, 20, 50].includes(Number(params.get('size'))) ? Number(params.get('size')) : 20;
-  const counts = useMemo(() => {
-    const result: Record<string, number> = { ACTIVE: 0, ALL: all.length };
-    for (const ticket of all) {
-      result[ticket.status] = (result[ticket.status] ?? 0) + 1;
-      if (ACTIVE_STATUSES.includes(ticket.status)) result.ACTIVE++;
-    }
-    return result;
-  }, [all]);
+  const counts = useMemo(() => queueCounts(all), [all]);
   const categories = useMemo(() => Array.from(new Set([...all.map((ticket) => ticket.category), ...(category ? [category] : [])])).sort((a, b) => categoryOf(a).label.localeCompare(categoryOf(b).label, 'th')), [all, category]);
-  const rows = useMemo(() => {
-    const search = query.trim().toLocaleLowerCase('th');
-    return all.filter((ticket) => {
-      const statusMatches = status === 'ALL' || (status === 'ACTIVE' ? ACTIVE_STATUSES.includes(ticket.status) : ticket.status === status);
-      return statusMatches && (!category || ticket.category === category) && (!search || `${ticket.id} ${shortId(ticket.id)} ${ticket.description} ${ticket.location} ${ticket.reporterEmail} ${categoryOf(ticket.category).label}`.toLocaleLowerCase('th').includes(search));
-    }).sort((a, b) => {
-      const time = (ticket: Ticket) => Date.parse(sort === 'updated' ? ticket.updatedAt : ticket.createdAt) || 0;
-      const difference = sort === 'oldest' ? time(a) - time(b) : time(b) - time(a);
-      return difference || a.id.localeCompare(b.id);
-    });
-  }, [all, query, category, status, sort]);
-  const pageCount = Math.max(1, Math.ceil(rows.length / size));
-  const requestedPage = Number(params.get('page'));
-  const page = Math.min(pageCount, Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
+  const rows = useMemo(() => filterQueue(all, { query, category, status, sort }), [all, query, category, status, sort]);
+  const { size, pageCount, page } = queuePage(params, rows.length);
   const visible = rows.slice((page - 1) * size, page * size);
   const filtered = query.trim() !== '' || category !== '' || status !== 'ACTIVE';
+  const empty = emptyQueueCopy(all.length, filtered);
   const update = (values: Record<string, string>, resetPage = true) => {
-    setParams((current) => {
-      const next = new URLSearchParams(current);
-      if (resetPage) next.delete('page');
-      for (const [key, value] of Object.entries(values)) {
-        if (!value || (key === 'status' && value === 'ACTIVE') || (key === 'sort' && value === 'oldest') || (key === 'size' && value === '20') || (key === 'page' && value === '1')) next.delete(key);
-        else next.set(key, value);
-      }
-      return next;
-    }, { replace: true });
+    setParams(current => updateQueueParams(current, values, resetPage), { replace: true });
   };
   const reset = () => update({ q: '', category: '', status: 'ACTIVE' });
   const changePage = (next: number) => {
@@ -87,10 +60,10 @@ export function Queue() {
     resultsHeading.current?.scrollIntoView({ block: 'start' });
   };
   const start = async (t: Ticket) => {
-    if (submitting.current) return;
+    if (submitting.current) { return; }
     submitting.current = true;
     setBusy(t.id);
-    try { await Api.start(t.id); toast('เริ่มซ่อมแล้ว'); load.reload(); } catch (x) { toast((x as Error).message, 'red'); } finally { submitting.current = false; setBusy(''); }
+    try { await Api.start(t.id); toast('เริ่มซ่อมแล้ว'); load.reload(); } catch (error_) { toast((error_ as Error).message, 'red'); } finally { submitting.current = false; setBusy(''); }
   };
   const pageNumbers = Array.from(new Set([1, page - 1, page, page + 1, pageCount])).filter((number) => number >= 1 && number <= pageCount).sort((a, b) => a - b);
   return (
@@ -110,13 +83,13 @@ export function Queue() {
           <div id="staff-queue-sort-field"><Select id="staff-queue-sort" label="เรียงตาม" value={sort} onChange={(event) => update({ sort: event.target.value })}><option value="oldest">เก่าที่สุดก่อน</option><option value="newest">ใหม่ที่สุดก่อน</option><option value="updated">อัปเดตล่าสุดก่อน</option></Select></div>
         </div>
         <div className="queue-results-heading">
-          <div><h2 ref={resultsHeading} tabIndex={-1}>รายการงาน</h2><p className="small muted" role="status">{!hasData ? load.loading ? 'กำลังโหลด…' : 'โหลดข้อมูลไม่สำเร็จ' : `${countLabel(rows.length)} รายการ${rows.length ? ` · แสดง ${countLabel((page - 1) * size + 1)}–${countLabel(Math.min(page * size, rows.length))}` : ''}`}</p></div>
+          <div><h2 ref={resultsHeading} tabIndex={-1}>รายการงาน</h2><output className="small muted">{queueResultLabel(hasData, load.loading, rows.length, page, size)}</output></div>
           {filtered && <Button kind="ghost" sm icon="x" onClick={reset}>ล้างตัวกรอง</Button>}
         </div>
         {load.error && <div className="queue-load-error"><ErrorBox error={load.error} />{hasData ? <p className="small muted">โหลดข้อมูลใหม่ไม่สำเร็จ กำลังแสดงข้อมูลล่าสุด</p> : <Button kind="outline" icon="refresh" onClick={load.reload}>ลองโหลดอีกครั้ง</Button>}</div>}
-        {load.loading && !hasData ? <div className="queue-loading" aria-label="กำลังโหลด"><Skeleton h={64} /><Skeleton h={64} /><Skeleton h={64} /></div> : hasData && rows.length === 0 ? (
-          <Empty icon={all.length === 0 ? 'inbox' : 'search'} title={all.length === 0 ? 'ยังไม่มีงานส่งถึงหน่วยงาน' : filtered ? 'ไม่พบงานที่ตรงเงื่อนไข' : 'ไม่มีงานค้าง'}>
-            <p className="small">{all.length === 0 ? 'งานใหม่จะแสดงที่นี่' : filtered ? 'ลองเปลี่ยนคำค้นหรือตัวกรอง' : 'ดูงานที่ปิดแล้วได้จากตัวกรองสถานะ'}</p>
+        {(load.loading && !hasData) && (<div className="queue-loading" aria-label="กำลังโหลด"><Skeleton h={64} /><Skeleton h={64} /><Skeleton h={64} /></div>)}{!(load.loading && !hasData) && (hasData && rows.length === 0 ? (
+          <Empty icon={all.length === 0 ? 'inbox' : 'search'} title={empty.title}>
+            <p className="small">{empty.detail}</p>
             {filtered ? <Button kind="outline" onClick={reset}>ล้างตัวกรอง</Button> : all.length > 0 && <Button kind="outline" onClick={() => update({ status: 'ALL' })}>ดูงานทั้งหมด</Button>}
           </Empty>
         ) : hasData && (
@@ -145,7 +118,7 @@ export function Queue() {
               })}</tbody>
             </table>
           </div>
-        )}
+        ))}
         {hasData && rows.length > 0 && <footer className="queue-pagination">
           <Select id="staff-queue-size" label="รายการต่อหน้า" value={size} onChange={(event) => update({ size: event.target.value })}>{[10, 20, 50].map((value) => <option key={value} value={value}>{value} รายการ</option>)}</Select>
           <nav className="queue-page-controls" aria-label="เลขหน้า">
@@ -170,13 +143,13 @@ export function Work() {
   const [photos, setPhotos] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  if (load.loading && !load.data) return <><Skeleton h={60} /><Skeleton h={420} /></>;
-  if (!load.data) return <ErrorBox error={load.error ?? 'ไม่พบรายการนี้'} />;
+  if (load.loading && !load.data) { return <><Skeleton h={60} /><Skeleton h={420} /></>; }
+  if (!load.data) { return <ErrorBox error={load.error ?? 'ไม่พบรายการนี้'} />; }
   const { ticket: t, history } = load.data;
   const c = categoryOf(t.category);
   const act = async (fn: () => Promise<unknown>, msg: string) => {
     setBusy(true); setErr('');
-    try { await fn(); toast(msg); setPhotos([]); load.reload(); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
+    try { await fn(); toast(msg); setPhotos([]); load.reload(); } catch (error_) { setErr((error_ as Error).message); } finally { setBusy(false); }
   };
   return (
     <>
@@ -186,7 +159,7 @@ export function Work() {
         <div className="stack" style={{ ['--gap' as string]: '24px' }}>
           <Gallery urls={t.photoUrls} />
           <div className="card lg stack"><h3>รายละเอียด</h3><p style={{ lineHeight: 1.7 }}>{t.description}</p><hr className="divider" />
-            <div className="two"><KV icon={c.icon} k="หมวด" v={c.label} /><KV icon="pin" k="สถานที่" v={t.location} /><KV icon="calendar" k="แจ้งเมื่อ" v={fmtDate(t.createdAt)} /><KV icon="mail" k="ติดต่อผู้แจ้ง" v={t.reporterEmail} /></div>
+            <div className="two"><KeyValue icon={c.icon} k="หมวด" v={c.label} /><KeyValue icon="pin" k="สถานที่" v={t.location} /><KeyValue icon="calendar" k="แจ้งเมื่อ" v={fmtDate(t.createdAt)} /><KeyValue icon="mail" k="ติดต่อผู้แจ้ง" v={t.reporterEmail} /></div>
           </div>
           <div className="card lg stack"><h3>ความคืบหน้า</h3><Timeline history={history} /></div>
         </div>

@@ -28,10 +28,10 @@ try {
   const errors = [];
   const unexpected = [];
   const writes = [];
-  await context.addInitScript(() => {
-    const claims = { role: 'STAFF', email: 'staff@chula.ac.th', departmentId: 'department-1', exp: Math.floor(Date.now() / 1000) + 3600 };
-    localStorage.setItem('fondue.token', `test.${btoa(JSON.stringify(claims))}.test`);
-  });
+  // Keep one login across page.goto calls; a newly generated JWT represents a different session.
+  const claims = { role: 'STAFF', email: 'staff@chula.ac.th', departmentId: 'department-1', exp: Math.floor(Date.now() / 1000) + 3600 };
+  const token = `test.${Buffer.from(JSON.stringify(claims)).toString('base64')}.test`;
+  await context.addInitScript(token => localStorage.setItem('fondue.token', token), token);
   await context.route('**/api/**', async route => {
     const request = route.request();
     const url = new URL(request.url());
@@ -60,9 +60,13 @@ try {
   const category = page.getByRole('combobox', { name: 'หมวดหมู่', exact: true });
   const sort = page.getByRole('combobox', { name: 'เรียงตาม', exact: true });
   const size = page.getByRole('combobox', { name: 'รายการต่อหน้า', exact: true });
-  const result = page.locator('.queue-results-heading [role=status]');
+  const result = page.locator('.queue-results-heading').getByRole('status');
   // Dropdowns are Radix Select: open the trigger, then choose the option by its value.
-  const pick = async (box, value) => { await box.click(); await page.locator(`[role=option][data-value="${value}"]`).click(); };
+  const pick = async (box, value) => {
+    await box.click();
+    await page.locator(`[role=option][data-value="${value}"]`).click();
+    await expect(box).toHaveAttribute('data-value', value);
+  };
   const refresh = page.getByRole('button', { name: 'รีเฟรช', exact: true });
   const clear = async () => {
     await page.getByRole('button', { name: 'ล้างตัวกรอง', exact: true }).first().click();

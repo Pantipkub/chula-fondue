@@ -52,8 +52,8 @@ export class TicketsService implements OnModuleInit {
 
   async findSubmission(req: { reporterId: string; submissionKey: string; submissionFingerprint: string }) {
     const ticket = await this.tickets.findOneBy({ reporterId: req.reporterId, submissionKey: req.submissionKey });
-    if (!ticket) return {};
-    if (ticket.submissionFingerprint !== req.submissionFingerprint) throw rpcError(GrpcStatus.ABORTED, 'Submission key was already used with different content');
+    if (!ticket) { return {}; }
+    if (ticket.submissionFingerprint !== req.submissionFingerprint) { throw rpcError(GrpcStatus.ABORTED, 'Submission key was already used with different content'); }
     return { ticket: (await this.present([ticket]))[0] };
   }
 
@@ -79,17 +79,17 @@ export class TicketsService implements OnModuleInit {
         await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`submission:${req.reporterId}:${req.submissionKey}`]);
         const existing = await manager.findOneBy(Ticket, { reporterId: req.reporterId, submissionKey: req.submissionKey });
         if (existing) {
-          if (existing.submissionFingerprint !== req.submissionFingerprint) throw rpcError(GrpcStatus.ABORTED, 'Submission key was already used with different content');
+          if (existing.submissionFingerprint !== req.submissionFingerprint) { throw rpcError(GrpcStatus.ABORTED, 'Submission key was already used with different content'); }
           return existing;
         }
         const result = await this.writeTransition(manager, ticket, 'SUBMITTED', 'Ticket created', []);
-        if (autoRoutingEnabled()) await this.resetRouting(manager, result.id);
+        if (autoRoutingEnabled()) { await this.resetRouting(manager, result.id); }
         return result;
       });
       return (await this.present([saved]))[0];
     }
     return this.setStatus(ticket, 'SUBMITTED', 'Ticket created', undefined, async (manager, saved) => {
-      if (autoRoutingEnabled()) await this.resetRouting(manager, saved.id);
+      if (autoRoutingEnabled()) { await this.resetRouting(manager, saved.id); }
     });
   }
 
@@ -120,8 +120,8 @@ export class TicketsService implements OnModuleInit {
     ticket.category = req.category.trim();
     return this.setStatus(ticket, ticket.status, `Category changed to ${ticket.category}`, undefined, async (manager) => {
       if (ticket.status === 'SUBMITTED') {
-        if (autoRoutingEnabled()) await this.resetRouting(manager, ticket.id);
-        else await this.stopRouting(manager, ticket.id, 'STOPPED', 'AUTO_ROUTING_DISABLED');
+        if (autoRoutingEnabled()) { await this.resetRouting(manager, ticket.id); }
+        else { await this.stopRouting(manager, ticket.id, 'STOPPED', 'AUTO_ROUTING_DISABLED'); }
       }
     });
   }
@@ -182,7 +182,7 @@ export class TicketsService implements OnModuleInit {
     requireFields({ id }, 'id');
     // Postgres rejects a malformed uuid with an error, so treat it as "no such ticket" here.
     const ticket = UUID.test(id) ? await this.tickets.findOneBy({ id }) : null;
-    if (!ticket) throw rpcError(GrpcStatus.NOT_FOUND, `Ticket ${id} not found`);
+    if (!ticket) { throw rpcError(GrpcStatus.NOT_FOUND, `Ticket ${id} not found`); }
     if (allowedStatuses.length && !allowedStatuses.includes(ticket.status)) {
       throw rpcError(
         GrpcStatus.FAILED_PRECONDITION,
@@ -197,12 +197,12 @@ export class TicketsService implements OnModuleInit {
     const expired = await this.tickets.find({ where: { status: 'RESOLVED', updatedAt: LessThan(cutoff) }, take: 50 });
     for (const ticket of expired) {
       try { await this.setStatus(ticket, 'CLOSED', 'Automatically closed after 7 days', ticket.reporterEmail); }
-      catch (error) { if (!(error instanceof RpcException)) throw error; }
+      catch (error_) { if (!(error_ instanceof RpcException)) { throw error_; } }
     }
   }
 
   async retryRouting(id: string) {
-    if (!autoRoutingEnabled()) throw rpcError(GrpcStatus.FAILED_PRECONDITION, 'Automatic routing is disabled');
+    if (!autoRoutingEnabled()) { throw rpcError(GrpcStatus.FAILED_PRECONDITION, 'Automatic routing is disabled'); }
     const ticket = await this.load(id, 'SUBMITTED');
     return this.setStatus(ticket, 'SUBMITTED', 'Automatic routing requested by admin', undefined,
       (manager) => this.resetRouting(manager, ticket.id));
@@ -229,11 +229,11 @@ export class TicketsService implements OnModuleInit {
       } else {
         const reason = typeof result === 'string' ? result : result.result;
         job.lastReason = reason;
-        if (retryAfterMs !== undefined) {
-          job.state = 'RETRY'; job.nextAttemptAt = new Date(Date.now() + retryAfterMs).toISOString();
-        } else {
+        if (retryAfterMs === undefined) {
           job.state = 'REVIEW';
           await this.writeTransition(manager, ticket, 'SUBMITTED', `Automatic routing needs review: ${reason}`, [], claim.requestId);
+        } else {
+          job.state = 'RETRY'; job.nextAttemptAt = new Date(Date.now() + retryAfterMs).toISOString();
         }
       }
       await manager.save(job);
@@ -252,7 +252,7 @@ export class TicketsService implements OnModuleInit {
   }
 
   private async present(tickets: Ticket[]) {
-    if (!tickets.length) return [];
+    if (!tickets.length) { return []; }
     const jobs = await this.tickets.manager.find(TicketRoutingJob, { where: { ticketId: In(tickets.map((ticket) => ticket.id)) } });
     const byId = new Map(jobs.map((job) => [job.ticketId, job]));
     return tickets.map(({ departmentContactEmail: _internal, submissionKey: _key, submissionFingerprint: _fingerprint, ...ticket }) => {
@@ -277,7 +277,7 @@ export class TicketsService implements OnModuleInit {
     if (ticket.id) {
       const current = await manager.findOne(Ticket, { where: { id: ticket.id }, lock: { mode: 'pessimistic_write' } });
       const expectedVersion = currentExpectedVersion();
-      if (!current || current.version !== ticket.version || current.status !== fromStatus ||
+      if (current?.version !== ticket.version || current.status !== fromStatus ||
           (expectedVersion !== undefined && expectedVersion !== current.version)) {
         throw rpcError(GrpcStatus.ABORTED, 'Ticket changed concurrently; reload and retry');
       }
@@ -286,8 +286,8 @@ export class TicketsService implements OnModuleInit {
     ticket.version = (ticket.version ?? 0) + 1;
     ticket.createdAt ??= now;
     ticket.updatedAt = now;
-    if (toStatus === 'RESOLVED') ticket.resolvedAt = now;
-    if (toStatus === 'CLOSED') ticket.closedAt = now;
+    if (toStatus === 'RESOLVED') { ticket.resolvedAt = now; }
+    if (toStatus === 'CLOSED') { ticket.closedAt = now; }
     const saved = await manager.save(ticket);
     await manager.save(TicketHistory, { ticketId: saved.id, fromStatus, toStatus, note, changedAt: now });
     // Ticket, history and outbox commit together; no broker call is made in the business transaction.
@@ -313,8 +313,8 @@ export class TicketsService implements OnModuleInit {
         headers: { 'X-Request-Id': currentRequestId() },
         signal: AbortSignal.timeout(DEPARTMENT_TIMEOUT_MS),
       });
-    } catch (error) {
-      if ((error as Error).name === 'TimeoutError') {
+    } catch (error_) {
+      if ((error_ as Error).name === 'TimeoutError') {
         this.logger.error(`GET ${url} -> no answer within ${DEPARTMENT_TIMEOUT_MS} ms`);
         throw rpcError(GrpcStatus.DEADLINE_EXCEEDED, `Department Service did not answer within ${DEPARTMENT_TIMEOUT_MS} ms`);
       }
@@ -326,7 +326,7 @@ export class TicketsService implements OnModuleInit {
     if (response.status === 404 || response.status === 400) {
       throw rpcError(GrpcStatus.NOT_FOUND, `Department ${departmentId} not found`);
     }
-    if (!response.ok) throw rpcError(GrpcStatus.UNAVAILABLE, `Department Service returned ${response.status}`);
+    if (!response.ok) { throw rpcError(GrpcStatus.UNAVAILABLE, `Department Service returned ${response.status}`); }
     return (await response.json()) as { id: string; name: string; contactEmail: string };
   }
 }

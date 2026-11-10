@@ -1,0 +1,9 @@
+{
+  "all": true,
+  "src": ["services"],
+  "include": ["services/*/src/**/*.ts"],
+  "extension": [".js", ".ts"],
+  "exclude-after-remap": true,
+  "reporter": ["text-summary", "lcov"],
+  "reports-dir": "coverage/backend"
+}

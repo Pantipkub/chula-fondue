@@ -22,7 +22,7 @@ export class AutoRoutingService implements OnModuleInit, OnModuleDestroy {
     this.timer = setInterval(() => void this.tick(), 2000);
     void this.tick();
   }
-  onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
+  onModuleDestroy() { if (this.timer) { clearInterval(this.timer); } }
 
   async claim(): Promise<RoutingClaim | undefined> {
     return this.db.transaction(async (manager) => {
@@ -32,17 +32,17 @@ export class AutoRoutingService implements OnModuleInit, OnModuleDestroy {
           { states: ['PENDING', 'RETRY'], processing: 'PROCESSING', now })
         .orderBy('j.nextAttemptAt', 'ASC').addOrderBy('j.ticketId', 'ASC')
         .setLock('pessimistic_write').setOnLocked('skip_locked').take(1).getOne();
-      if (!job) return;
+      if (!job) { return; }
       // No ticket lock here: every business transition locks ticket before job to avoid deadlocks.
       const ticket = await manager.findOneBy(Ticket, { id: job.ticketId });
-      if (!ticket || ticket.status !== 'SUBMITTED') {
+      if (ticket?.status !== 'SUBMITTED') {
         job.state = ticket?.status === 'ASSIGNED' ? 'DONE' : 'STOPPED';
         job.leaseToken = ''; job.leaseUntil = ''; job.updatedAt = now;
         await manager.save(job);
         return;
       }
       const exhausted = job.attempts >= 5;
-      if (!exhausted) job.attempts++;
+      if (!exhausted) { job.attempts++; }
       job.state = 'PROCESSING'; job.leaseToken = randomUUID();
       job.leaseUntil = new Date(Date.now() + 15000).toISOString(); job.updatedAt = now;
       await manager.save(job);
@@ -51,29 +51,36 @@ export class AutoRoutingService implements OnModuleInit, OnModuleDestroy {
   }
 
   async tick() {
-    if (this.busy || !autoRoutingEnabled()) return;
+    if (this.busy || !autoRoutingEnabled()) { return; }
     this.busy = true;
     try {
       for (let i = 0; i < 10 && autoRoutingEnabled(); i++) {
         const claim = await this.claim();
-        if (!claim) break;
-        try {
-          if (claim.exhausted) { await this.tickets.finishRouting(claim, 'RETRIES_EXHAUSTED'); continue; }
-          const result = await this.match(claim);
-          await this.tickets.finishRouting(claim, result);
-          this.logger.log(`ticket=${claim.ticket.id} attempt=${claim.attempts} result=${result.result} requestId=${claim.requestId}`);
-        } catch (error) {
-          // A manual action or a newer lease won. It must never be overwritten or rescheduled.
-          if (error instanceof RpcException) continue;
-          const reason = error instanceof InvalidRoutingResponse ? 'INVALID_RULE' : 'SERVICE_UNAVAILABLE';
-          const delay = reason === 'INVALID_RULE' ? undefined : retryDelay(claim.attempts);
-          await this.tickets.finishRouting(claim, delay === undefined && reason !== 'INVALID_RULE' ? 'RETRIES_EXHAUSTED' : reason, delay)
-            .catch((failure) => { if (!(failure instanceof RpcException)) throw failure; });
-          this.logger.warn(`ticket=${claim.ticket.id} attempt=${claim.attempts} reason=${reason} requestId=${claim.requestId}`);
-        }
+        if (!claim) { break; }
+        await this.routeClaim(claim);
       }
-    } catch (error) { this.logger.warn(`Routing will resume: ${(error as Error).message}`); }
+    } catch (error_) { this.logger.warn(`Routing will resume: ${(error_ as Error).message}`); }
     finally { this.busy = false; }
+  }
+
+  private async routeClaim(claim: RoutingClaim) {
+    try {
+      if (claim.exhausted) {
+        await this.tickets.finishRouting(claim, 'RETRIES_EXHAUSTED');
+        return;
+      }
+      const result = await this.match(claim);
+      await this.tickets.finishRouting(claim, result);
+      this.logger.log(`ticket=${claim.ticket.id} attempt=${claim.attempts} result=${result.result} requestId=${claim.requestId}`);
+    } catch (error_) {
+      // A manual action or a newer lease won. It must never be overwritten or rescheduled.
+      if (error_ instanceof RpcException) return;
+      const reason = error_ instanceof InvalidRoutingResponse ? 'INVALID_RULE' : 'SERVICE_UNAVAILABLE';
+      const delay = reason === 'INVALID_RULE' ? undefined : retryDelay(claim.attempts);
+      await this.tickets.finishRouting(claim, delay === undefined && reason !== 'INVALID_RULE' ? 'RETRIES_EXHAUSTED' : reason, delay)
+        .catch((error_) => { if (!(error_ instanceof RpcException)) throw error_; });
+      this.logger.warn(`ticket=${claim.ticket.id} attempt=${claim.attempts} reason=${reason} requestId=${claim.requestId}`);
+    }
   }
 
   private async match(claim: RoutingClaim): Promise<RoutingMatch> {
@@ -81,17 +88,17 @@ export class AutoRoutingService implements OnModuleInit, OnModuleDestroy {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Request-Id': claim.requestId },
       body: JSON.stringify({ category: claim.ticket.category }), signal: AbortSignal.timeout(3000),
     });
-    if (response.status >= 500) throw new Error('Department Service unavailable');
-    if (!response.ok) throw new InvalidRoutingResponse();
+    if (response.status >= 500) { throw new Error('Department Service unavailable'); }
+    if (!response.ok) { throw new InvalidRoutingResponse(); }
     let value: RoutingMatch;
-    try { value = await response.json() as RoutingMatch; } catch (error) {
-      if (['AbortError', 'TimeoutError'].includes((error as Error).name)) throw error;
+    try { value = await response.json() as RoutingMatch; } catch (error_) {
+      if (['AbortError', 'TimeoutError'].includes((error_ as Error).name)) { throw error_; }
       throw new InvalidRoutingResponse();
     }
-    if (value?.result === 'NO_RULE' || value?.result === 'AMBIGUOUS_RULES') return value;
+    if (value?.result === 'NO_RULE' || value?.result === 'AMBIGUOUS_RULES') { return value; }
     if (value?.result !== 'MATCHED' || !uuid(value.ruleId) || !uuid(value.department?.id) ||
         typeof value.department?.name !== 'string' || !value.department.name.trim() ||
-        typeof value.department?.contactEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.department.contactEmail) ||
+        !validRoutingEmail(value.department?.contactEmail) ||
         typeof value.category !== 'string' || value.category.toLowerCase() !== claim.ticket.category.trim().toLowerCase()) {
       throw new InvalidRoutingResponse();
     }
@@ -100,3 +107,9 @@ export class AutoRoutingService implements OnModuleInit, OnModuleDestroy {
 }
 class InvalidRoutingResponse extends Error {}
 const uuid = (value: unknown) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+export function validRoutingEmail(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 254 || /\s/.test(value)) return false;
+  const separator = value.indexOf('@');
+  const domainEnd = value.lastIndexOf('.');
+  return separator > 0 && separator === value.lastIndexOf('@') && domainEnd > separator + 1 && domainEnd < value.length - 1;
+}

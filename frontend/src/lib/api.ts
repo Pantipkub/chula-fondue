@@ -37,6 +37,13 @@ export class ApiError extends Error {
 let onUnauthorized: () => void = () => {};
 export const setUnauthorizedHandler = (fn: () => void) => { onUnauthorized = fn; };
 
+function conflictMessage(raw: string) {
+  if (raw.includes('routing rule already exists')) return 'หมวดนี้เลือกหน่วยงานรับงานไว้แล้ว';
+  if (raw.includes('active routing rules')) return 'กรุณายกเลิกการส่งต่ออัตโนมัติที่ใช้หน่วยงานนี้ก่อน';
+  if (raw.includes('routing is disabled')) return 'ระบบส่งต่ออัตโนมัติยังไม่เปิดใช้งาน';
+  return raw.includes('exists') || raw.includes('already') ? 'มีข้อมูลนี้อยู่แล้ว' : 'สถานะงานเปลี่ยนไปแล้ว กรุณารีเฟรชหน้า';
+}
+
 // Turns the gateway's error body into a short Thai message; the original text is kept for the details.
 function friendly(status: number, raw: string) {
   const accountMessages: [RegExp, string][] = [
@@ -49,16 +56,13 @@ function friendly(status: number, raw: string) {
     [/does not exist or is inactive/i, 'หน่วยงานนี้ไม่มีอยู่หรือปิดใช้งานแล้ว กรุณาเลือกหน่วยงานใหม่'],
   ];
   const accountMessage = accountMessages.find(([re]) => re.test(raw));
-  if (accountMessage) return accountMessage[1];
-  if (status === 503) return 'ระบบบางส่วนไม่พร้อมใช้งานชั่วคราว ลองอีกครั้งในอีกสักครู่';
-  if (status === 504) return 'ระบบตอบช้าเกินไป ลองอีกครั้งในอีกสักครู่';
-  if (status === 401) return raw.includes('Invalid email') ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : 'กรุณาเข้าสู่ระบบอีกครั้ง';
-  if (status === 403) return 'คุณไม่มีสิทธิ์ทำรายการนี้';
-  if (status === 404) return 'ไม่พบข้อมูลที่ต้องการ';
-  if (status === 409 && raw.includes('routing rule already exists')) return 'หมวดนี้เลือกหน่วยงานรับงานไว้แล้ว';
-  if (status === 409 && raw.includes('active routing rules')) return 'กรุณายกเลิกการส่งต่ออัตโนมัติที่ใช้หน่วยงานนี้ก่อน';
-  if (status === 409 && raw.includes('routing is disabled')) return 'ระบบส่งต่ออัตโนมัติยังไม่เปิดใช้งาน';
-  if (status === 409) return raw.includes('exists') || raw.includes('already') ? 'มีข้อมูลนี้อยู่แล้ว' : 'สถานะงานเปลี่ยนไปแล้ว กรุณารีเฟรชหน้า';
+  if (accountMessage) { return accountMessage[1]; }
+  if (status === 503) { return 'ระบบบางส่วนไม่พร้อมใช้งานชั่วคราว ลองอีกครั้งในอีกสักครู่'; }
+  if (status === 504) { return 'ระบบตอบช้าเกินไป ลองอีกครั้งในอีกสักครู่'; }
+  if (status === 401) { return raw.includes('Invalid email') ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : 'กรุณาเข้าสู่ระบบอีกครั้ง'; }
+  if (status === 403) { return 'คุณไม่มีสิทธิ์ทำรายการนี้'; }
+  if (status === 404) { return 'ไม่พบข้อมูลที่ต้องการ'; }
+  if (status === 409) { return conflictMessage(raw); }
   const known: [RegExp, string][] = [
     [/Reset link is invalid or expired/i, 'ลิงก์ตั้งรหัสผ่านไม่ถูกต้อง หมดอายุ หรือถูกใช้แล้ว กรุณาขอลิงก์ใหม่'],
     [/password must be longer/i, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'],
@@ -79,7 +83,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   const headers = new Headers(init.headers);
   const snapshot = tokenStore.snapshot();
   const token = snapshot.token;
-  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (token) { headers.set('Authorization', `Bearer ${token}`); }
   let body = init.body;
   if (init.json !== undefined) { headers.set('Content-Type', 'application/json'); body = JSON.stringify(init.json); }
   let res: Response;
@@ -92,7 +96,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   const data = text ? (() => { try { return JSON.parse(text); } catch { return text; } })() : null;
   if (!res.ok) {
     const raw = typeof data === 'object' && data ? [data.message].flat().join(', ') : String(data ?? '');
-    if (res.status === 401 && token && !path.startsWith('/auth/') && tokenStore.isCurrent(snapshot)) onUnauthorized();
+    if (res.status === 401 && token && !path.startsWith('/auth/') && tokenStore.isCurrent(snapshot)) { onUnauthorized(); }
     throw new ApiError(res.status, friendly(res.status, raw));
   }
   return data as T;

@@ -60,6 +60,7 @@ Gateway ใช้ได้ที่ http://localhost:3100 เมื่อใช�
 
 ```powershell
 npm test
+npm run test:coverage
 npm run test:e2e
 npm run test:recovery
 npm run test:platform
@@ -78,6 +79,8 @@ npm run test:ui
 สำหรับ UI ของ Compose ตั้ง `WEB_URL=http://127.0.0.1:8080`. บน Linux ให้ติดตั้ง Playwright Chromium และตั้ง `BROWSER_CHANNEL=chromium`. ผลทดสอบและภาพหน้าจออยู่ `test-results/`. `test:recovery` หยุด/เริ่ม RabbitMQ เฉพาะ project `fondue-demo` และปรับวันที่ข้อมูล fixture เพื่อทดสอบปิดงานอัตโนมัติ. ห้ามใช้ script นี้กับ deployment จริง.
 
 CI รัน build, unit, API, broker recovery และ responsive UI checks แล้วเก็บ evidence. ต้องดูผล CI จริงก่อนอ้างว่าผ่าน.
+
+SonarQube อ่าน Coverage จากรายงาน LCOV ที่สร้างด้วย `npm run test:coverage`; เมื่อเปิด demo แล้วใช้ `npm run test:coverage:demo` เพื่อรวมผล unit, frontend และ integration กับฐานข้อมูลจริงตามลำดับ. ดู [วิธีสแกนและตรวจผล SonarQube](docs/sonarqube.md). การรัน backend บน host ต้องตั้ง `AUTH_DATABASE_URL`, `DEPARTMENT_DATABASE_URL`, `TICKET_DATABASE_URL` และ `ANALYTICS_DATABASE_URL`; หากขาดค่าบริการจะหยุดพร้อมข้อความแจ้งชื่อ environment ที่ต้องตั้ง. Compose กำหนดค่าเหล่านี้ให้อยู่แล้ว.
 
 ## Load testing
 

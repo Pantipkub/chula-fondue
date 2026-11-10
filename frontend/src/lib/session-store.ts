@@ -11,8 +11,8 @@ function readShared(): SessionSnapshot | null | undefined {
     const raw = localStorage.getItem(SHARED_KEY);
     if (raw) {
       const value = JSON.parse(raw);
-      if (typeof value.id === 'string' && value.token === null) return null;
-      if (typeof value.id === 'string' && typeof value.token === 'string') return value;
+      if (typeof value.id === 'string' && value.token === null) { return null; }
+      if (typeof value.id === 'string' && typeof value.token === 'string') { return value; }
     }
     // Existing browser sessions can migrate without an extra login.
     const token = localStorage.getItem(TOKEN_KEY);
@@ -42,12 +42,31 @@ persist();
 function notify() { listeners.forEach(listener => listener()); }
 
 function reconcile() {
-  if (!current.token || !current.shared) return;
+  if (!current.token || !current.shared) { return; }
   const shared = readShared();
-  if (shared === undefined || (shared?.id === current.id && shared.token === current.token)) return;
+  if (shared === undefined || (shared?.id === current.id && shared.token === current.token)) { return; }
   current = { id: crypto.randomUUID(), token: null, shared: false, notice: shared ? 'replaced' : null };
   persist();
   notify();
+}
+
+function publishSession(token: string) {
+  try {
+    localStorage.setItem(SHARED_KEY, JSON.stringify({ id: current.id, token }));
+    try { localStorage.setItem(TOKEN_KEY, token); } catch { /* The shared envelope remains authoritative. */ }
+  } catch { current.shared = false; }
+}
+
+function clearPublishedSession() {
+  const shared = readShared();
+  // An old tab must never delete or revoke the winning tab's session.
+  if (current.shared && shared?.id === current.id && shared.token === current.token) {
+    try {
+      localStorage.setItem(SHARED_KEY, JSON.stringify({ id: crypto.randomUUID(), token: null }));
+      localStorage.removeItem(TOKEN_KEY);
+    } catch { /* Storage blocked. */ }
+  }
+  current = { id: crypto.randomUUID(), token: null, shared: false, notice: current.notice };
 }
 
 export const tokenStore = {
@@ -59,23 +78,9 @@ export const tokenStore = {
     reconcile();
     if (token) {
       current = { id: crypto.randomUUID(), token, shared: publish, notice: null };
-      if (publish) {
-        try {
-          // A fresh ID changes on every successful login, even if the JWT is identical.
-          localStorage.setItem(SHARED_KEY, JSON.stringify({ id: current.id, token }));
-          try { localStorage.setItem(TOKEN_KEY, token); } catch { /* The shared envelope remains authoritative. */ }
-        } catch { current.shared = false; }
-      }
+      if (publish) publishSession(token);
     } else {
-      const shared = readShared();
-      // An old tab must never delete or revoke the winning tab's session.
-      if (current.shared && shared?.id === current.id && shared.token === current.token) {
-        try {
-          localStorage.setItem(SHARED_KEY, JSON.stringify({ id: crypto.randomUUID(), token: null }));
-          localStorage.removeItem(TOKEN_KEY);
-        } catch { /* Storage blocked. */ }
-      }
-      current = { id: crypto.randomUUID(), token: null, shared: false, notice: current.notice };
+      clearPublishedSession();
     }
     persist();
     notify();
@@ -83,17 +88,17 @@ export const tokenStore = {
   subscribe(listener: () => void) {
     listeners.add(listener);
     const storage = (event: StorageEvent) => {
-      if (event.key === null || event.key === SHARED_KEY || event.key === TOKEN_KEY) reconcile();
+      if (event.key === null || event.key === SHARED_KEY || event.key === TOKEN_KEY) { reconcile(); }
     };
-    window.addEventListener('storage', storage);
-    window.addEventListener('focus', reconcile);
+    globalThis.addEventListener('storage', storage);
+    globalThis.addEventListener('focus', reconcile);
     document.addEventListener('visibilitychange', reconcile);
     reconcile();
     listener();
     return () => {
       listeners.delete(listener);
-      window.removeEventListener('storage', storage);
-      window.removeEventListener('focus', reconcile);
+      globalThis.removeEventListener('storage', storage);
+      globalThis.removeEventListener('focus', reconcile);
       document.removeEventListener('visibilitychange', reconcile);
     };
   },

@@ -50,7 +50,7 @@ export class AuthService implements OnModuleInit {
       this.logger.warn('ADMIN_EMAIL / ADMIN_PASSWORD not set: no Admin account was seeded');
       return;
     }
-    if (await this.users.existsBy({ email: normalizeEmail(ADMIN_EMAIL) })) return;
+    if (await this.users.existsBy({ email: normalizeEmail(ADMIN_EMAIL) })) { return; }
     await this.createUser(ADMIN_EMAIL, ADMIN_PASSWORD, 'ADMIN', '');
     this.logger.log(`Seeded Admin account ${normalizeEmail(ADMIN_EMAIL)}`);
   }
@@ -97,16 +97,16 @@ export class AuthService implements OnModuleInit {
     return this.users.manager.transaction(async manager => {
       await accountLock(manager);
       const user = await manager.findOneBy(User, { id });
-      if (!user) throw new NotFoundException('User not found');
+      if (!user) { throw new NotFoundException('User not found'); }
       const role = dto.role ?? user.role;
       const active = dto.active ?? user.active;
-      if (id === actorId && !active) throw new ConflictException('Cannot disable your own account');
+      if (id === actorId && !active) { throw new ConflictException('Cannot disable your own account'); }
       if (user.role === 'ADMIN' && user.active && (role !== 'ADMIN' || !active) && await manager.countBy(User, { role: 'ADMIN', active: true }) <= 1) {
         throw new ConflictException('Cannot remove the last active admin');
       }
       const departmentId = role === 'STAFF' ? dto.departmentId ?? user.departmentId : '';
-      if (role === 'STAFF' && active) await this.validateDepartment(departmentId);
-      if (role !== user.role || active !== user.active || departmentId !== user.departmentId) user.tokenVersion++;
+      if (role === 'STAFF' && active) { await this.validateDepartment(departmentId); }
+      if (role !== user.role || active !== user.active || departmentId !== user.departmentId) { user.tokenVersion++; }
       Object.assign(user, { role, active, departmentId });
       return publicUser(await manager.save(user));
     });
@@ -116,7 +116,7 @@ export class AuthService implements OnModuleInit {
     await this.users.manager.transaction(async manager => {
       await accountLock(manager);
       const user = await manager.findOneBy(User, { id });
-      if (!user?.active || !await verifyPassword(dto.currentPassword, user.passwordHash)) throw new UnauthorizedException('Current password is incorrect');
+      if (!user?.active || !await verifyPassword(dto.currentPassword, user.passwordHash)) { throw new UnauthorizedException('Current password is incorrect'); }
       user.passwordHash = await hashPassword(dto.password); user.tokenVersion++;
       await manager.save(user);
       await manager.delete(PasswordReset, { userId: id });
@@ -137,7 +137,7 @@ export class AuthService implements OnModuleInit {
     await this.users.manager.transaction(async manager => {
       await accountLock(manager);
       const user = await manager.findOneBy(User, { email: normalizeEmail(email), active: true });
-      if (!user) return;
+      if (!user) { return; }
       const token = randomBytes(32).toString('hex');
       const expiresAt = new Date(Date.now() + 30 * 60000).toISOString();
       const resetUrl = new URL('/reset-password', process.env.WEB_PUBLIC_URL ?? 'http://localhost:8080');
@@ -156,7 +156,7 @@ export class AuthService implements OnModuleInit {
       await accountLock(manager);
       const reset = await manager.findOneBy(PasswordReset, { tokenHash: digest(dto.token) });
       const user = reset && await manager.findOneBy(User, { id: reset.userId });
-      if (!reset || !user?.active || reset.expiresAt <= new Date().toISOString() || reset.tokenVersion !== user.tokenVersion) throw new BadRequestException('Reset link is invalid or expired');
+      if (!reset || !user?.active || reset.expiresAt <= new Date().toISOString() || reset.tokenVersion !== user.tokenVersion) { throw new BadRequestException('Reset link is invalid or expired'); }
       user.passwordHash = await hashPassword(dto.password); user.tokenVersion++;
       await manager.save(user);
       await manager.delete(PasswordReset, { userId: user.id });
@@ -170,21 +170,21 @@ export class AuthService implements OnModuleInit {
   }
 
   private async validateDepartment(id: string) {
-    if (!id || !/^[a-f\d-]{36}$/i.test(id)) throw new BadRequestException('departmentId must be a UUID');
+    if (!id || !/^[a-f\d-]{36}$/i.test(id)) { throw new BadRequestException('departmentId must be a UUID'); }
     let response: Response;
     try { response = await fetch(`${process.env.DEPARTMENT_SERVICE_URL ?? 'http://localhost:3001'}/departments/${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(3000) }); }
     catch { throw new ServiceUnavailableException('Department Service unavailable'); }
-    if (response.status === 404) throw new BadRequestException('Department does not exist or is inactive');
-    if (!response.ok) throw new ServiceUnavailableException('Department Service unavailable');
+    if (response.status === 404) { throw new BadRequestException('Department does not exist or is inactive'); }
+    if (!response.ok) { throw new ServiceUnavailableException('Department Service unavailable'); }
   }
 
   private async createUser(rawEmail: string, password: string, role: AccountRole, departmentId: string) {
-    if (role === 'STAFF') await this.validateDepartment(departmentId);
+    if (role === 'STAFF') { await this.validateDepartment(departmentId); }
     const email = normalizeEmail(rawEmail);
-    if (await this.users.existsBy({ email })) throw new ConflictException(`Email ${email} is already registered`);
+    if (await this.users.existsBy({ email })) { throw new ConflictException(`Email ${email} is already registered`); }
     let user: User;
     try { user = await this.users.save({ email, passwordHash: await hashPassword(password), role, departmentId, active: true, tokenVersion: 0 }); }
-    catch (error) { if ((error as { driverError?: { code?: string } }).driverError?.code === '23505') throw new ConflictException('Email is already registered'); throw error; }
+    catch (error_) { if ((error_ as { driverError?: { code?: string } }).driverError?.code === '23505') { throw new ConflictException('Email is already registered'); } throw error_; }
     return publicUser(user);
   }
 }

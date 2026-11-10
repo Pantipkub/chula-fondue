@@ -11,11 +11,14 @@ import { TicketRoutingJob } from './ticket-routing-job.entity.js';
 import { AutoRoutingService } from './auto-routing.service.js';
 import { DepartmentUsageController } from './department-usage.controller.js';
 
+const databaseUrl = process.env.TICKET_DATABASE_URL;
+if (!databaseUrl?.trim()) throw new Error('TICKET_DATABASE_URL is required');
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      url: process.env.TICKET_DATABASE_URL ?? 'postgresql://fondue:fondue@localhost:5433/ticket',
+      url: databaseUrl,
       entities: [Ticket, TicketHistory, OutboxEvent, TicketRoutingJob],
       synchronize: true,
       // Keep retrying while PostgreSQL starts; Docker restarts the container if it never comes up.

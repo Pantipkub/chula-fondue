@@ -8,11 +8,14 @@ import { RoutingRule } from './routing-rule.entity.js';
 import { RoutingRulesController } from './routing-rules.controller.js';
 import { RoutingRulesService } from './routing-rules.service.js';
 
+const databaseUrl = process.env.DEPARTMENT_DATABASE_URL;
+if (!databaseUrl?.trim()) throw new Error('DEPARTMENT_DATABASE_URL is required');
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      url: process.env.DEPARTMENT_DATABASE_URL ?? 'postgresql://fondue:fondue@localhost:5433/department',
+      url: databaseUrl,
       entities: [Department, RoutingRule],
       synchronize: true,
       // Keep retrying while PostgreSQL starts; Docker restarts the container if it never comes up.

@@ -18,13 +18,13 @@ export class NotificationsController {
     url.searchParams.set('viewerId', user.sub);
     if (user.role !== 'ADMIN') {
       url.searchParams.set('recipientEmail', user.email);
-      if (user.role === 'STAFF' && user.departmentId) url.searchParams.set('recipientDepartmentId', user.departmentId);
+      if (user.role === 'STAFF' && user.departmentId) { url.searchParams.set('recipientDepartmentId', user.departmentId); }
     }
     try {
       const response = await fetch(url, { method: id ? 'PUT' : 'GET', signal: AbortSignal.timeout(5000), headers: { 'X-Request-Id': currentRequestId() } });
-      if (response.status === 404) throw new NotFoundException('Notification not found');
-      if (!response.ok) throw new Error('upstream');
+      if (response.status === 404) { throw new NotFoundException('Notification not found'); }
+      if (!response.ok) { throw new Error('upstream'); }
       return id ? undefined : await response.json();
-    } catch (error) { if (error instanceof NotFoundException) throw error; throw new ServiceUnavailableException('Notification Service unavailable'); }
+    } catch (error_) { if (error_ instanceof NotFoundException) { throw error_; } throw new ServiceUnavailableException('Notification Service unavailable'); }
   }
 }
