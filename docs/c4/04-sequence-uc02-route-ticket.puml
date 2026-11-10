@@ -1,0 +1,96 @@
+@startuml
+title UC-02 Route Ticket to Department
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam maxMessageSize 300
+skinparam responseMessageBelowArrow true
+skinparam sequence {
+  ParticipantBackgroundColor #DCEEFF
+  ParticipantBorderColor #4B8CCB
+  ActorBackgroundColor #DCEEFF
+  ActorBorderColor #164B78
+  LifeLineBorderColor #8EABBF
+  GroupBackgroundColor #EEF4F8
+}
+skinparam database {
+  BackgroundColor #DCEEFF
+  BorderColor #4B8CCB
+}
+skinparam queue {
+  BackgroundColor #FFF0E5
+  BorderColor #D87645
+}
+skinparam note {
+  BackgroundColor #FFF8E8
+  BorderColor #D9B867
+}
+
+actor "Central Admin" as admin
+participant "Web Frontend" as web
+participant "API Gateway" as gateway
+participant "Auth Service" as auth
+participant "Department\nService" as department
+participant "Ticket Service" as ticket
+database "Ticket DB\n(PostgreSQL)" as ticket_db
+queue "RabbitMQ" as broker
+participant "Notification\nService" as notification
+participant "Gmail API" as gmail
+
+autonumber
+
+== Review the ticket ==
+admin -> web : Open dashboard, select a "Submitted" ticket
+web -> gateway : GET /api/tickets?status=SUBMITTED, GET /api/tickets/{id}/history
+gateway -> ticket : gRPC ListTickets, GetTicketHistory
+ticket --> gateway : tickets, details, photo URLs, location, history
+gateway --> web : 200 ticket detail
+web -> gateway : GET /api/departments
+gateway -> department : GET /departments
+department --> gateway : department list
+gateway --> web : 200 department list
+
+== Assign to a department ==
+admin -> web : Select department, submit assignment
+web -> gateway : POST /api/tickets/{id}/assign {departmentId}
+activate gateway
+gateway -> auth : POST /auth/session (verify token)
+auth --> gateway : claims (role ADMIN, otherwise 403)
+gateway -> ticket : gRPC AssignTicket(id, departmentId)
+activate ticket
+ticket -> ticket_db : Load ticket (must be SUBMITTED, or ASSIGNED for re-routing; otherwise 409)
+ticket -> department : GET /departments/{departmentId} (3 s timeout)
+alt department exists
+  department --> ticket : 200 {name, contactEmail}
+  ticket -> ticket_db : One transaction: status ASSIGNED + history + outbox event
+  ticket_db --> ticket : committed
+  ticket --> gateway : ticket ASSIGNED
+  gateway --> web : 200 OK
+  web --> admin : Ticket shows "Assigned"
+else department not found
+  department --> ticket : 404
+  ticket --> gateway : NOT_FOUND
+  gateway --> web : 404, choose another department
+else Department Service unreachable or no answer in 3 s
+  ticket --> gateway : UNAVAILABLE / DEADLINE_EXCEEDED
+  gateway --> web : 503 / 504, nothing committed
+end
+deactivate ticket
+deactivate gateway
+
+== Subflow: reject an invalid, duplicate or spam ticket ==
+admin -> web : Reject with a written reason
+web -> gateway : POST /api/tickets/{id}/reject {reason}
+gateway -> ticket : gRPC RejectTicket(id, reason)
+ticket -> ticket_db : One transaction: status REJECTED + history + outbox event
+ticket --> gateway : ticket REJECTED
+gateway --> web : 200 OK
+
+== Asynchronous notification (the admin's request does not wait) ==
+ticket -> ticket_db : Outbox relay (every 2 s) reads unsent events
+ticket -> broker : Publish ticket.status_changed
+broker -> notification : Deliver event (at least once)
+notification -> notification : Record in MongoDB by eventId, then ack
+notification -> gmail : Email the department (Assigned) or reporter (Rejected)
+note right of broker : The same event also goes to the\n'analytics' queue for Analytics Service
+@enduml

@@ -1,0 +1,98 @@
+@startuml
+title UC-03 Resolve Ticket
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam maxMessageSize 300
+skinparam responseMessageBelowArrow true
+skinparam sequence {
+  ParticipantBackgroundColor #DCEEFF
+  ParticipantBorderColor #4B8CCB
+  ActorBackgroundColor #DCEEFF
+  ActorBorderColor #164B78
+  LifeLineBorderColor #8EABBF
+  GroupBackgroundColor #EEF4F8
+}
+skinparam database {
+  BackgroundColor #DCEEFF
+  BorderColor #4B8CCB
+}
+skinparam queue {
+  BackgroundColor #FFF0E5
+  BorderColor #D87645
+}
+skinparam note {
+  BackgroundColor #FFF8E8
+  BorderColor #D9B867
+}
+
+actor "Department Staff" as staff
+participant "Web Frontend" as web
+participant "API Gateway" as gateway
+participant "Auth Service" as auth
+database "Photo Storage\n(uploads volume)" as photo_volume
+participant "Ticket Service" as ticket
+database "Ticket DB\n(PostgreSQL)" as ticket_db
+queue "RabbitMQ" as broker
+participant "Notification\nService" as notification
+participant "Gmail API" as gmail
+
+autonumber
+
+== View department queue ==
+staff -> web : Open department queue
+web -> gateway : GET /api/tickets
+gateway -> ticket : gRPC ListTickets(caller's departmentId)
+ticket --> gateway : tickets assigned to the department
+gateway --> web : 200 ticket list
+
+== Start progress ==
+staff -> web : Click "Start work"
+web -> gateway : POST /api/tickets/{id}/start
+activate gateway
+gateway -> auth : POST /auth/session (verify token)
+auth --> gateway : claims (role STAFF, departmentId)
+gateway -> ticket : gRPC GetTicketHistory(id)
+ticket --> gateway : ticket (departmentId, version)
+break not STAFF, or the ticket belongs to another department
+  gateway --> web : 403 Forbidden
+end
+gateway -> ticket : gRPC StartProgress(id, expected version)
+activate ticket
+ticket -> ticket_db : One transaction: ASSIGNED -> IN_PROGRESS + history + outbox event
+ticket --> gateway : ticket IN_PROGRESS
+deactivate ticket
+gateway --> web : 200 OK
+deactivate gateway
+
+== Perform maintenance ==
+staff -> staff : Repair the issue on site
+
+== Upload completion photos and resolve ==
+staff -> web : Attach 1-5 completion photos, click "Resolved"
+web -> gateway : POST /api/tickets/{id}/resolve (multipart)
+activate gateway
+gateway -> gateway : Same token and department checks as "Start progress";\nvalidate photos (1-5 files, max 5 MB, JPEG/PNG/WebP)
+break no photo or invalid photo
+  gateway --> web : 400 Bad Request
+end
+gateway -> photo_volume : Save photos
+photo_volume --> gateway : photo URLs
+gateway -> ticket : gRPC ResolveTicket(id, completionPhotoUrls, expected version)
+activate ticket
+ticket -> ticket_db : One transaction: IN_PROGRESS -> RESOLVED + photo URLs\n+ history + outbox event
+ticket --> gateway : ticket RESOLVED
+deactivate ticket
+gateway --> web : 200 OK
+deactivate gateway
+web --> staff : Status "Resolved" with completion proof
+note over gateway, ticket_db : Wrong status, or the ticket changed since it was loaded: 409 Conflict
+
+== Asynchronous notification (the staff's request does not wait) ==
+ticket -> ticket_db : Outbox relay (every 2 s) reads unsent events
+ticket -> broker : Publish ticket.status_changed (IN_PROGRESS, RESOLVED)
+broker -> notification : Deliver event (at least once)
+notification -> notification : Record in the reporter's inbox (MongoDB) by eventId, then ack
+notification -> gmail : Email the reporter
+note right of broker : Also delivered to Analytics Service;\nresolvedAt feeds the MTTR report
+@enduml
