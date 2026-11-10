@@ -179,8 +179,21 @@ const encodedWord = (value: string) => `=?UTF-8?B?${Buffer.from(value, 'utf8').t
 
 /** The whole message (headers + multipart/alternative body) as Gmail's `raw` field: base64url. */
 export function mimeMessage(event: EmailEvent, from: string) {
+  return mimeParts(event, from, buildEmail(event));
+}
+
+export interface RecoveryEmail {
+  kind: 'PASSWORD_RESET'; eventId: string; recipientEmail: string; resetUrl: string; expiresAt: string;
+}
+export function recoveryMessage(event: RecoveryEmail, from: string) {
+  const subject = 'ตั้งรหัสผ่านใหม่ — Chula Fondue';
+  const text = `มีคำขอตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ\n\n${event.resetUrl}\n\nลิงก์ใช้ได้ครั้งเดียวและหมดอายุภายใน 30 นาที หากคุณไม่ได้ร้องขอ ให้ข้ามอีเมลนี้`;
+  const html = `<div style="font-family:${FONT};max-width:600px;margin:auto;padding:24px;color:${INK}"><h1>ตั้งรหัสผ่านใหม่</h1><p>มีคำขอตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ</p><p><a href="${escapeHtml(event.resetUrl)}">ตั้งรหัสผ่านใหม่</a></p><p>ลิงก์ใช้ได้ครั้งเดียวและหมดอายุภายใน 30 นาที หากคุณไม่ได้ร้องขอ ให้ข้ามอีเมลนี้</p></div>`;
+  return mimeParts(event, from, { subject, text, html });
+}
+function mimeParts(event: { eventId: string; recipientEmail: string }, from: string, parts: { subject: string; text: string; html: string }) {
   if ([from, event.recipientEmail].some((value) => /[\r\n]/.test(value))) throw new Error('Invalid email header');
-  const { subject, text, html } = buildEmail(event);
+  const { subject, text, html } = parts;
   const boundary = `fondue-${event.eventId.replace(/[^\w-]/g, '')}`;
   return Buffer.from([
     `From: Chula Fondue <${from}>`, `To: ${event.recipientEmail}`, `Subject: ${encodedWord(subject)}`,

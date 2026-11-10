@@ -29,16 +29,19 @@ function imageExtension(data: Buffer) {
 }
 
 /** Validates the uploaded photos, stores them and returns one public link per photo. */
-export async function storePhotos(files: UploadedPhoto[] | undefined): Promise<string[]> {
+export function validatePhotos(files: UploadedPhoto[] | undefined) {
   if (files && files.length > MAX_PHOTOS) throw new BadRequestException('Too many files');
   if (!files?.length) throw new BadRequestException('At least one photo is required (form field "photos")');
-  const photos = files.map((file) => {
+  return files.map((file) => {
     if (file.buffer.length > MAX_PHOTO_BYTES) throw new BadRequestException('File too large');
     const extension = imageExtension(file.buffer);
     if (!extension) throw new BadRequestException(`${file.originalname} is not a JPEG, PNG or WebP image`);
     return { data: file.buffer, extension };
   });
-  return Promise.all(photos.map(({ data, extension }) => (CLOUDINARY_URL ? uploadToCloudinary : saveLocally)(data, extension)));
+}
+
+export async function storePhotos(files: UploadedPhoto[] | undefined): Promise<string[]> {
+  return Promise.all(validatePhotos(files).map(({ data, extension }) => (CLOUDINARY_URL ? uploadToCloudinary : saveLocally)(data, extension)));
 }
 
 // Signed upload to Cloudinary's REST API; the response carries the permanent link.

@@ -33,6 +33,12 @@ Staff สาธิตสังกัดงานอาคารและสถ�
 - Analytics Service: MTTR จากเวลาแก้ไขเสร็จจริง, สถิติตามหมวด/หน่วยงาน/ช่วงวัน และจุดที่แจ้งบ่อย
 - Notification ผ่าน transactional outbox + RabbitMQ เก็บใน MongoDB พร้อมหน้าแสดงประวัติ; ส่ง Gmail ได้เมื่อตั้งค่า OAuth
 - JWT/RBAC, ownership checks, rate limit, concurrency checks, request IDs, health/readiness และ persistent photo storage
+- แจ้งเตือน Staff ตามหน่วยงาน พร้อมอ่านแล้วแยกแต่ละบัญชีและลิงก์เปิดคำร้อง
+- Admin เปลี่ยนบทบาท/ย้ายหน่วยงาน/เปิดปิดบัญชี; ผู้ใช้เปลี่ยนหรือกู้รหัสผ่านได้ พร้อมยกเลิก token เดิม
+- ปิดใช้งานหน่วยงานโดยเก็บประวัติ และตรวจงานค้าง/Staff/กฎก่อนปิด
+- ส่งคำร้องซ้ำด้วย `Idempotency-Key` เดิมได้โดยไม่สร้างเรื่องซ้ำ
+
+รายละเอียดพฤติกรรมและ API เพิ่มเติม: [Platform hardening](docs/platform-hardening.md)
 
 ## โครงสร้าง
 
@@ -56,6 +62,10 @@ Gateway ใช้ได้ที่ http://localhost:3100 เมื่อใช�
 npm test
 npm run test:e2e
 npm run test:recovery
+npm run test:platform
+npm run test:platform:e2e
+# ตรวจฟีเจอร์ใหม่ใน browser (macOS ใช้ Chrome; Linux ตั้ง BROWSER_CHANNEL=chromium)
+npm run test:platform:ui
 # หลังเปิด auto-routing และ seed กฎแล้ว
 npm run test:routing
 npm run test:routing:recovery

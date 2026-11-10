@@ -1,8 +1,9 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 // Public fields match the camelCase form of proto/ticket.proto; the response mapper omits internal contact data.
 // Optional strings default to '' (the proto3 default) and timestamps are ISO strings.
 @Entity()
+@Index('ticket_submission_key', ['reporterId', 'submissionKey'], { unique: true, where: '"submissionKey" <> \'\'' })
 export class Ticket {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -27,6 +28,9 @@ export class Ticket {
 
   @Column({ default: '' })
   reporterId: string;
+
+  @Column({ default: '' }) submissionKey: string;
+  @Column({ default: '' }) submissionFingerprint: string;
 
   @Column({ default: 0 })
   version: number;

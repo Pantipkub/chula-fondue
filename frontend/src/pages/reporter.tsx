@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Api } from '../lib/api';
@@ -24,21 +24,25 @@ export function ReportForm() {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const location = [building.trim(), spot.trim()].filter(Boolean).join(' · ');
+  const submissionKey = useMemo(() => crypto.randomUUID(), [category, description, building, spot, photos]);
+  const submitting = useRef(false);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (guest) return setNeedLogin(true); // Enter key path
     if (!photos.length) return setErr('ต้องแนบรูปอย่างน้อย 1 รูป');
     if (!location) return setErr('กรุณาระบุสถานที่');
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true); setErr('');
     try {
       const f = new FormData();
       f.append('category', category); f.append('location', location); f.append('description', description.trim());
       photos.forEach((p) => f.append('photos', p));
-      const t = await Api.createTicket(f);
+      const t = await Api.createTicket(f, submissionKey);
       recentTickets.add(t.id);
       nav(`/report/done/${t.id}`, { state: { ticket: t } });
-    } catch (x) { setErr((x as Error).message); setBusy(false); }
+    } catch (x) { setErr((x as Error).message); setBusy(false); } finally { submitting.current = false; }
   };
   const c = categoryOf(category);
   return (
