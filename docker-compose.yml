@@ -90,6 +90,8 @@ services:
     environment:
       AUTH_PORT: 3002
       AUTH_DATABASE_URL: ${AUTH_DATABASE_URL:-postgresql://fondue:fondue@postgres:5432/auth}
+      DEPARTMENT_SERVICE_URL: http://department-service:3001
+      NOTIFICATION_SERVICE_URL: http://notification-service:8082
     expose: ['3002']
     depends_on:
       postgres: { condition: service_healthy }
@@ -103,6 +105,8 @@ services:
     environment:
       DEPARTMENT_PORT: 3001
       DEPARTMENT_DATABASE_URL: ${DEPARTMENT_DATABASE_URL:-postgresql://fondue:fondue@postgres:5432/department}
+      AUTH_SERVICE_URL: http://auth-service:3002
+      TICKET_SERVICE_HTTP_URL: http://ticket-service:8081
     expose: ['3001']
     depends_on:
       postgres: { condition: service_healthy }
@@ -150,6 +154,7 @@ services:
     build: { context: ., dockerfile: docker/Dockerfile, args: { SERVICE: api-gateway } }
     environment:
       GATEWAY_PORT: 3000
+      AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-30}
       GATEWAY_PUBLIC_URL: ${GATEWAY_PUBLIC_URL:-}
       ANALYTICS_SERVICE_URL: http://analytics-service:3003
       NOTIFICATION_SERVICE_URL: http://notification-service:8082

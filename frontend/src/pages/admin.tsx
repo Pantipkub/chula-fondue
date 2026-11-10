@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Api } from '../lib/api';
-import type { Department, Status } from '../lib/api';
+import type { Department, PublicUser, Status } from '../lib/api';
 import { ago, categoryOf, fmtDate, isRoutingPending, shortId } from '../lib/format';
 import { RoutingNotice } from '../components/routing';
 import { RoutingRules } from '../components/routing-rules';
@@ -151,7 +151,7 @@ const DEPT_ICONS = ['zap', 'droplet', 'wind', 'wifi', 'building', 'wrench'];
 const DEPT_TONES = ['honey', 'sage', 'lilac', 'pink', 'gray', 'pink'];
 export function Departments() {
   const toast = useToast();
-  const load = useLoad(() => Promise.all([Api.departments(), Api.listTickets()]));
+  const load = useLoad(() => Promise.all([Api.departments(true), Api.listTickets()]));
   const [edit, setEdit] = useState<Partial<Department> | null>(null);
   const [del, setDel] = useState<Department | null>(null);
   const [busy, setBusy] = useState(false);
@@ -176,11 +176,12 @@ export function Departments() {
         <div className="cards3">
           {depts.map((d, i) => (
             <div key={d.id} className="card stack" style={{ ['--gap' as string]: '12px' }}>
-              <div className="row between"><Bubble icon={DEPT_ICONS[i % 6]} tone={DEPT_TONES[i % 6]} size={48} iconSize={24} /><div className="row" style={{ ['--gap' as string]: '8px' }}><button className="icon-btn" aria-label={`แก้ไข ${d.name}`} onClick={() => { setErr(''); setEdit({ ...d }); }}><Icon name="pencil" /></button><button className="icon-btn danger" aria-label={`ลบ ${d.name}`} onClick={() => { setErr(''); setDel(d); }}><Icon name="trash" /></button></div></div>
-              <h3>{d.name}</h3><Meta icon="mail">{d.contactEmail}</Meta>
+              <div className="row between"><Bubble icon={DEPT_ICONS[i % 6]} tone={DEPT_TONES[i % 6]} size={48} iconSize={24} /><div className="row" style={{ ['--gap' as string]: '8px' }}><button className="icon-btn" aria-label={`แก้ไข ${d.name}`} onClick={() => { setErr(''); setEdit({ ...d }); }}><Icon name="pencil" /></button>{d.active !== false && <button className="icon-btn danger" aria-label={`ปิดใช้งาน ${d.name}`} onClick={() => { setErr(''); setDel(d); }}><Icon name="x" /></button>}</div></div>
+              <h3>{d.name}</h3>{d.active === false && <span className="tag">ปิดใช้งานแล้ว</span>}<Meta icon="mail">{d.contactEmail}</Meta>
               <div className="row wrap" style={{ ['--gap' as string]: '6px' }}>{d.buildings.length ? d.buildings.map((b) => <span key={b} className="tag">{b}</span>) : <span className="xs muted">ยังไม่ระบุอาคาร</span>}</div>
               <hr className="divider" />
               <div className="row between"><span className="small muted">งานที่ยังเปิดอยู่</span><span className="count" style={{ background: 'var(--pink-100)', color: 'var(--pink-800)' }}>{open(d.id)}</span></div>
+              {d.active === false && <Button kind="outline" busy={busy} onClick={async () => { setBusy(true); try { await Api.updateDepartment(d.id, { active: true }); toast('เปิดใช้งานหน่วยงานแล้ว'); load.reload(); } catch (x) { toast((x as Error).message, 'red'); } finally { setBusy(false); } }}>เปิดใช้งานอีกครั้ง</Button>}
             </div>
           ))}
           <button className="card stack" style={{ ['--gap' as string]: '10px', alignItems: 'center', justifyContent: 'center', border: '1.5px dashed var(--pink-300)', background: 'var(--pink-50)', boxShadow: 'none', cursor: 'pointer', minHeight: 220 }} onClick={() => { setErr(''); setEdit({ name: '', contactEmail: '', buildings: [] }); }}>
@@ -207,11 +208,11 @@ export function Departments() {
           <div className="row" style={{ justifyContent: 'flex-end' }}><Button kind="outline" type="button" onClick={() => setEdit(null)}>ยกเลิก</Button><Button icon="check" busy={busy} type="submit">บันทึก</Button></div>
         </form>}
       </Drawer>
-      <Modal open={!!del} onClose={() => setDel(null)} label="ลบหน่วยงาน">
+      <Modal open={!!del} onClose={() => setDel(null)} label="ปิดใช้งานหน่วยงาน">
         <Bubble icon="trash" tone="red" size={56} iconSize={26} />
-        <div className="stack" style={{ ['--gap' as string]: '6px' }}><h2>ลบ “{del?.name}”?</h2><p className="small muted">หน่วยงานนี้จะไม่อยู่ในตัวเลือกตอนมอบหมายงานอีก{del && open(del.id) > 0 ? ` · ตอนนี้ยังมีงานเปิดอยู่ ${open(del.id)} เรื่อง` : ''}</p></div>
+        <div className="stack" style={{ ['--gap' as string]: '6px' }}><h2>ปิดใช้งาน “{del?.name}”?</h2><p className="small muted">เก็บประวัติเดิมไว้ และนำออกจากตัวเลือกมอบหมายงาน ต้องย้ายหรือปิดบัญชี Staff ที่ใช้งานอยู่ จัดการงานค้าง และปิดกฎส่งต่อก่อน{del && open(del.id) > 0 ? ` · ยังมีงานเปิดอยู่ ${open(del.id)} เรื่อง` : ''}</p></div>
         <ErrorBox error={err} />
-        <div className="two"><Button kind="outline" onClick={() => setDel(null)}>ยกเลิก</Button><Button kind="danger" icon="trash" busy={busy} onClick={async () => { setBusy(true); setErr(''); try { await Api.deleteDepartment(del!.id); toast('ลบหน่วยงานแล้ว'); setDel(null); load.reload(); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); } }}>ลบหน่วยงาน</Button></div>
+        <div className="two"><Button kind="outline" onClick={() => setDel(null)}>ยกเลิก</Button><Button kind="danger" icon="x" busy={busy} disabled={!!del && open(del.id) > 0} onClick={async () => { setBusy(true); setErr(''); try { await Api.deleteDepartment(del!.id); toast('ปิดใช้งานหน่วยงานแล้ว'); setDel(null); load.reload(); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); } }}>ปิดใช้งานหน่วยงาน</Button></div>
       </Modal>
     </>
   );
@@ -225,6 +226,16 @@ export function Users() {
   const [f, setF] = useState({ email: '', password: '', role: 'STAFF' as 'STAFF' | 'ADMIN', departmentId: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [editing, setEditing] = useState<{ user: PublicUser; role: 'REPORTER' | 'STAFF' | 'ADMIN'; departmentId: string; active: boolean } | null>(null);
+  const [editError, setEditError] = useState('');
+  const saveAccount = async (e: FormEvent) => {
+    e.preventDefault(); if (!editing) return;
+    setBusy(true); setEditError('');
+    try {
+      await Api.updateUser(editing.user.id, { role: editing.role, active: editing.active, ...(editing.role === 'STAFF' ? { departmentId: editing.departmentId } : {}) });
+      toast('บันทึกบัญชีแล้ว สิทธิ์เดิมถูกยกเลิก'); setEditing(null); accounts.reload();
+    } catch (x) { setEditError((x as Error).message); } finally { setBusy(false); }
+  };
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setErr('');
     try {
@@ -242,14 +253,14 @@ export function Users() {
   );
   return (
     <>
-      <PageHead title="บัญชีเจ้าหน้าที่" sub="สร้างบัญชี Staff และ Admin · ผู้แจ้งสมัครเองได้ที่หน้าสมัครสมาชิก" />
+      <PageHead title="บัญชีเจ้าหน้าที่" sub="สร้างบัญชี จัดการบทบาท ย้ายหน่วยงาน และเปิด/ปิดใช้งานบัญชี" />
       <div className="split users-split">
         <div className="stack" style={{ ['--gap' as string]: '24px' }}>
           <form className="card lg stack" style={{ ['--gap' as string]: '18px' }} onSubmit={submit}>
             <h3>สร้างบัญชีใหม่</h3>
             <ErrorBox error={err} />
             <Input id="ue" label="อีเมล" required type="email" icon="mail" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} placeholder="name@chula.ac.th" />
-            <Input id="up" label="รหัสผ่านเริ่มต้น" required minLength={8} type="text" icon="lock" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} help="อย่างน้อย 8 ตัวอักษร · แจ้งเจ้าหน้าที่ผ่านช่องทางที่ปลอดภัย" autoComplete="off" />
+            <Input id="up" label="รหัสผ่านเริ่มต้น" required minLength={8} maxLength={128} type="password" icon="lock" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} help="อย่างน้อย 8 ตัวอักษร · แจ้งเจ้าหน้าที่ผ่านช่องทางที่ปลอดภัย" autoComplete="new-password" />
             <div className="field"><span className="label">บทบาท <span className="req">*</span></span>
               <div className="seg" role="radiogroup">{(['STAFF', 'ADMIN'] as const).map((r) => <button type="button" role="radio" aria-checked={f.role === r} key={r} className={f.role === r ? 'on' : ''} onClick={() => setF({ ...f, role: r })}><Icon name={r === 'STAFF' ? 'wrench' : 'shield'} size={16} />{r === 'STAFF' ? 'Staff · เจ้าหน้าที่' : 'Admin · ผู้ดูแลระบบ'}</button>)}</div>
             </div>
@@ -259,7 +270,7 @@ export function Users() {
           <ErrorBox error={accounts.error} />
           {!!accounts.data?.length && (
             <div className="card stack"><h3>บัญชีในระบบ</h3>
-              {accounts.data.map((c) => <div key={c.email} className="row between account-row" style={{ padding: '10px 0', borderTop: '1px solid var(--line-200)' }}><span className="row small strong"><span className="avatar">{c.email.slice(0, 2)}</span>{c.email}</span><span className={`rolechip ${c.role === 'ADMIN' ? 'tone-pink' : 'tone-lilac'}`}>{c.role}{c.departmentId && ` · ${depts.data?.find(d => d.id === c.departmentId)?.name ?? ''}`}</span></div>)}
+              {accounts.data.map((c) => <div key={c.email} className="row between wrap account-row" style={{ padding: '10px 0', borderTop: '1px solid var(--line-200)' }}><span className="row small strong" style={{ overflowWrap: 'anywhere' }}><span className="avatar">{c.email.slice(0, 2)}</span>{c.email}</span><span className={`rolechip ${c.role === 'ADMIN' ? 'tone-pink' : 'tone-lilac'}`}>{c.role}{c.departmentId && ` · ${depts.data?.find(d => d.id === c.departmentId)?.name ?? ''}`}{c.active === false && ' · ปิดใช้งาน'}</span><Button kind="outline" sm aria-label={`จัดการบัญชี ${c.email}`} onClick={() => { setEditError(''); setEditing({ user: c, role: c.role as 'REPORTER' | 'STAFF' | 'ADMIN', departmentId: c.departmentId, active: c.active !== false }); }}>จัดการ</Button></div>)}
               <span className="xs muted">ข้อมูลบัญชีจาก Auth Service</span>
             </div>
           )}
@@ -272,6 +283,16 @@ export function Users() {
           {role('shield', 'sage', 'ผู้ดูแลระบบ (Admin)', ['มอบหมาย · ปฏิเสธ · เปลี่ยนหน่วยงาน', 'จัดการหน่วยงานและบัญชีเจ้าหน้าที่'])}
         </div>
       </div>
+      <Modal open={!!editing} onClose={() => setEditing(null)} label="จัดการบัญชี">
+        {editing && <form onSubmit={saveAccount} className="stack" style={{ gap: 18 }}>
+          <h2>จัดการบัญชี</h2><p className="small" style={{ overflowWrap: 'anywhere' }}>{editing.user.email}</p>
+          <Note>เมื่อเปลี่ยนบทบาท หน่วยงาน หรือสถานะ ระบบจะยกเลิกสิทธิ์ของ session เดิมทันที</Note>
+          <Select id="account-role" label="บทบาท" value={editing.role} onChange={e => setEditing({ ...editing, role: e.target.value as typeof editing.role })}><option value="REPORTER">Reporter · ผู้แจ้ง</option><option value="STAFF">Staff · เจ้าหน้าที่</option><option value="ADMIN">Admin · ผู้ดูแลระบบ</option></Select>
+          {editing.role === 'STAFF' && <Select id="account-department" label="หน่วยงาน" required value={editing.departmentId} onChange={e => setEditing({ ...editing, departmentId: e.target.value })}><option value="">เลือกหน่วยงาน</option>{(depts.data ?? []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</Select>}
+          <label className="check"><input type="checkbox" checked={editing.active} onChange={e => setEditing({ ...editing, active: e.target.checked })} />เปิดใช้งานบัญชี</label>
+          <ErrorBox error={editError} /><div className="two"><Button kind="outline" type="button" onClick={() => setEditing(null)}>ยกเลิก</Button><Button type="submit" busy={busy}>บันทึกบัญชี</Button></div>
+        </form>}
+      </Modal>
     </>
   );
 }

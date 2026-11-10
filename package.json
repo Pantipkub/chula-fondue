@@ -22,7 +22,11 @@
     "test:recovery": "node --env-file-if-exists=.env.demo tests/recovery.mjs",
     "test:routing": "node --env-file-if-exists=.env.demo tests/routing-e2e.mjs",
     "test:routing:recovery": "node --env-file-if-exists=.env.demo tests/routing-recovery.mjs",
-    "test:ui:live": "node tests/ui-live.mjs"
+    "test:ui:live": "node tests/ui-live.mjs",
+    "test:platform": "node --env-file-if-exists=.env.demo --test tests/platform.integration.test.mjs",
+    "test:platform:e2e": "node --env-file-if-exists=.env.demo tests/platform-e2e.mjs",
+    "test:platform:ui": "node --env-file-if-exists=.env.demo tests/platform-ui.mjs",
+    "test:ui:auth-tabs": "node tests/ui-auth-tabs.mjs"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

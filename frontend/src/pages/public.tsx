@@ -76,7 +76,7 @@ export function Landing() {
 }
 
 // ---------------------------------------------------------------- auth
-function AuthFrame({ title, sub, aside, children }: { title: string; sub: string; aside?: React.ReactNode; children: React.ReactNode }) {
+export function AuthFrame({ title, sub, aside, children }: { title: string; sub: string; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="auth">
       <div className="brand">
@@ -94,7 +94,7 @@ function AuthFrame({ title, sub, aside, children }: { title: string; sub: string
 }
 
 export function Login() {
-  const { login, ensureToken, session } = useAuth();
+  const { login, ensureToken, session, sessionNotice } = useAuth();
   const nav = useNavigate();
   const loc = useLocation() as { state?: { from?: string; registered?: string } };
   const [email, setEmail] = useState(loc.state?.registered ?? '');
@@ -112,11 +112,13 @@ export function Login() {
       <form onSubmit={submit} className="stack" style={{ width: 'min(440px, 100%)', ['--gap' as string]: '20px' }}>
         <div className="stack" style={{ ['--gap' as string]: '6px' }}><h1>เข้าสู่ระบบ</h1><p className="muted small">ใช้อีเมลที่ลงทะเบียนไว้ เพื่อดูและจัดการเรื่องที่คุณแจ้ง</p></div>
         {loc.state?.registered && <Note tone="sage" icon="check">สมัครสมาชิกเรียบร้อย เข้าสู่ระบบได้เลย</Note>}
+        {sessionNotice === 'replaced' && <div role="status"><Note>ออกจากระบบแล้ว เนื่องจากมีการเข้าสู่ระบบในแท็บอื่น กรุณาเข้าสู่ระบบอีกครั้ง</Note></div>}
         <ErrorBox error={err} />
         <Input id="email" label="อีเมล" icon="mail" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@chula.ac.th" />
         <Input id="pw" label="รหัสผ่าน" icon="lock" type={show ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         <label className="check"><input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} />แสดงรหัสผ่าน</label>
         <Button block busy={busy} type="submit">เข้าสู่ระบบ</Button>
+        <Link to="/forgot-password" className="center small">ลืมรหัสผ่าน?</Link>
         <div className="row"><hr className="divider" /><span className="small muted">หรือ</span><hr className="divider" /></div>
         <Button kind="outline" icon="user" block type="button" onClick={async () => { if (!session) await ensureToken(); nav('/report'); }}>ดำเนินการต่อแบบผู้เยี่ยมชม</Button>
         <Note>บัญชีเจ้าหน้าที่ (Staff) และผู้ดูแลระบบ (Admin) สร้างโดยผู้ดูแลระบบเท่านั้น</Note>

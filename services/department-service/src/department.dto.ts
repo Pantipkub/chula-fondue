@@ -1,4 +1,4 @@
-import { IsArray, IsEmail, IsNotEmpty, IsOptional, IsString, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsString, ValidateIf } from 'class-validator';
 
 export class CreateDepartmentDto {
   @IsString()
@@ -18,6 +18,7 @@ export class CreateDepartmentDto {
 const ifSent = () => ValidateIf((_, value) => value !== undefined);
 
 export class UpdateDepartmentDto {
+  @ifSent() @IsBoolean() active?: boolean;
   @ifSent()
   @IsString()
   @IsNotEmpty()

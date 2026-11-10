@@ -1,4 +1,5 @@
 import { Metadata, status as GrpcStatus } from '@grpc/grpc-js';
+import { createHash } from 'node:crypto';
 import {
   BadRequestException,
   Body,
@@ -6,6 +7,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Headers,
   HttpCode,
   HttpException,
   Inject,
@@ -20,7 +22,7 @@ import type { ClientGrpc } from '@nestjs/microservices';
 import { firstValueFrom, Observable } from 'rxjs';
 import { CurrentUser, Roles } from './auth.js';
 import type { AuthUser } from './auth.js';
-import { PhotosInterceptor, storePhotos } from './photo-storage.js';
+import { PhotosInterceptor, storePhotos, validatePhotos } from './photo-storage.js';
 import type { UploadedPhoto } from './photo-storage.js';
 import { currentRequestId } from './request-context.js';
 
@@ -60,10 +62,20 @@ export class TicketsController implements OnModuleInit {
     @CurrentUser() user: AuthUser,
     @Body() body: Record<string, string> = {},
     @UploadedFiles() photos?: UploadedPhoto[],
+    @Headers('idempotency-key') submissionKey?: string,
   ) {
     const reporterEmail = user.email;
     for (const field of ['category', 'location', 'description']) {
       if (typeof body[field] !== 'string' || !body[field].trim() || body[field].length > 5000) throw new BadRequestException(`${field} is required and must be at most 5000 characters`);
+    }
+    let submissionFingerprint = '';
+    if (submissionKey !== undefined) {
+      if (!/^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(submissionKey)) throw new BadRequestException('Idempotency-Key must be a UUID');
+      const images = validatePhotos(photos);
+      submissionFingerprint = createHash('sha256').update(JSON.stringify({ category: body.category, location: body.location, description: body.description,
+        photos: images.map(p => createHash('sha256').update(p.data).digest('hex')) })).digest('hex');
+      const previous = await this.forward('findSubmission', { reporterId: user.sub, submissionKey, submissionFingerprint }) as { ticket?: unknown };
+      if (previous.ticket) return previous.ticket;
     }
     const photoUrls = await storePhotos(photos);
     return this.forward('createTicket', {
@@ -73,6 +85,7 @@ export class TicketsController implements OnModuleInit {
       photoUrls,
       reporterEmail,
       reporterId: user.sub,
+      submissionKey, submissionFingerprint,
     });
   }
 

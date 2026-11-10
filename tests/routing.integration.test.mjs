@@ -38,6 +38,8 @@ test('automatic routing: PostgreSQL transactions, leases and lifecycle', { skip:
     const outbox = (id) => db.getRepository(OutboxEvent).createQueryBuilder('e').where("e.payload->>'ticketId' = :id", { id }).getMany();
     const match = () => rules.match('IT / Network');
     globalThis.fetch = async (url, init) => {
+      if (String(url).includes('/department-usage/')) return Response.json({ staff: 0, total: 0 });
+      if (String(url).endsWith('/usage')) return Response.json({ open: 0 });
       if (String(url).includes('/routing-rules/match')) return Response.json(await rules.match(JSON.parse(init.body).category));
       const id = decodeURIComponent(String(url).split('/').pop());
       return Response.json(await departments.findOne(id));

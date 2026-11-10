@@ -4,6 +4,7 @@ package ticket;
 
 service TicketService {
   rpc CreateTicket (CreateTicketRequest) returns (Ticket);
+  rpc FindSubmission (FindSubmissionRequest) returns (FindSubmissionResponse);
   rpc ListTickets (ListTicketsRequest) returns (ListTicketsResponse);
   rpc GetTicketHistory (TicketIdRequest) returns (TicketHistoryResponse);
   rpc AssignTicket (AssignTicketRequest) returns (Ticket);
@@ -55,7 +56,12 @@ message CreateTicketRequest {
   repeated string photo_urls = 4;   // at least one
   string reporter_email = 5;
   string reporter_id = 6;
+  string submission_key = 7;
+  string submission_fingerprint = 8;
 }
+
+message FindSubmissionRequest { string reporter_id = 1; string submission_key = 2; string submission_fingerprint = 3; }
+message FindSubmissionResponse { Ticket ticket = 1; }
 
 message ListTicketsRequest {
   string status = 1;            // optional filter
