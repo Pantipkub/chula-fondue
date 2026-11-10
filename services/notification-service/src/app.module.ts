@@ -4,9 +4,10 @@ import { Module } from '@nestjs/common';
 import { HealthController } from './health.controller.js';
 import { NotificationStore } from './notification-store.js';
 import { NotificationsController } from './notifications.controller.js';
+import { RecoveryController } from './recovery.controller.js';
 
 @Module({
-  controllers: [HealthController, NotificationsController, InboxController],
+  controllers: [HealthController, NotificationsController, InboxController, RecoveryController],
   providers: [EmailService,
     {
       provide: NotificationStore,

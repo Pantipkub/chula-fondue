@@ -1,5 +1,5 @@
 import { AuthRateLimit } from './rate-limit.js';
-import { Controller, Get, Post, Req, Res, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Req, Res, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { CurrentUser, Public, Roles } from './auth.js';
 import type { AuthUser } from './auth.js';
@@ -18,9 +18,21 @@ export class AuthController {
   users(@Req() req: Request, @Res() res: Response) {
     return proxyRest('Auth Service', AUTH_SERVICE_URL, req, res);
   }
-  @Post(['register', 'login', 'guest'])
+  @Post(['register', 'login', 'guest', 'forgot-password', 'reset-password'])
   @Public()
   open(@Req() req: Request, @Res() res: Response) {
+    this.limiter.check(req.ip ?? 'unknown');
+    if (req.path.endsWith('forgot-password')) this.limiter.check(`recovery:${String(req.body?.email ?? '').trim().toLowerCase()}`);
+    return proxyRest('Auth Service', AUTH_SERVICE_URL, req, res);
+  }
+
+  @Put('users/:id') @Roles('ADMIN')
+  updateUser(@Req() req: Request, @Res() res: Response) {
+    return proxyRest('Auth Service', AUTH_SERVICE_URL, req, res);
+  }
+
+  @Post(['password', 'logout']) @Roles('ADMIN', 'STAFF', 'REPORTER')
+  account(@Req() req: Request, @Res() res: Response) {
     this.limiter.check(req.ip ?? 'unknown');
     return proxyRest('Auth Service', AUTH_SERVICE_URL, req, res);
   }

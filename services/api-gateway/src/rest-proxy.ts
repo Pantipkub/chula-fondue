@@ -1,6 +1,7 @@
 import { GatewayTimeoutException, ServiceUnavailableException } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { currentRequestId } from './request-context.js';
+import type { AuthUser } from './auth.js';
 
 /** How long the gateway waits for a REST service (connect + full response) before answering 504. */
 export const REST_TIMEOUT_MS = Number(process.env.REST_TIMEOUT_MS ?? 5000);
@@ -17,6 +18,7 @@ export async function proxyRest(serviceName: string, baseUrl: string, req: Reque
       method: req.method,
       headers: {
         'X-Request-Id': currentRequestId(),
+        'X-User-Id': (req as Request & { user?: AuthUser }).user?.sub ?? '',
         ...(hasBody && { 'Content-Type': 'application/json' }),
       },
       body: hasBody ? JSON.stringify(req.body ?? {}) : undefined,

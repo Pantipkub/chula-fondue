@@ -21,6 +21,9 @@ export class User {
   @Column({ default: '' })
   departmentId: string;
 
+  @Column({ default: true }) active: boolean;
+  @Column({ default: 0 }) tokenVersion: number;
+
   @CreateDateColumn()
   createdAt: Date;
 }

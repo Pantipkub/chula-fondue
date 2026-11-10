@@ -1,0 +1,43 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, Arial, sans-serif","fontSize":"14px","primaryColor":"#E7F2FB","primaryTextColor":"#17324D","primaryBorderColor":"#5798D0","lineColor":"#526777","actorBkg":"#DCEEFF","actorBorder":"#5798D0","actorTextColor":"#17324D","actorLineColor":"#A7B8C5","signalColor":"#344B5D","signalTextColor":"#17324D","labelBoxBkgColor":"#F1F6FA","labelBoxBorderColor":"#9BB9D0","labelTextColor":"#17324D","noteBkgColor":"#FFF8E8","noteBorderColor":"#D9B867","noteTextColor":"#59471C","activationBkgColor":"#EEF5FA","activationBorderColor":"#8EABBf","sequenceNumberColor":"#FFFFFF"}}}%%
+sequenceDiagram
+  autonumber
+  actor Reporter
+  participant GW as API Gateway
+  participant Photos as Photo Storage
+  participant TS as Ticket Service
+  participant PG as PostgreSQL
+  participant Auto as Auto Routing Worker
+  participant Dept as Department Service
+
+  Reporter->>GW: POST /tickets with category location description and photos
+  Note over GW: Check reporter role and required fields
+  opt Photos attached
+    GW->>Photos: Store photos in Cloudinary or local uploads volume
+    Photos-->>GW: Photo URLs
+  end
+  GW->>TS: gRPC CreateTicket with reporter identity and photo URLs
+  TS->>PG: Transaction creates SUBMITTED ticket and history plus outbox
+  opt Automatic routing enabled
+    TS->>PG: Create PENDING routing job in same transaction
+  end
+  PG-->>TS: Commit successful
+  TS-->>GW: Ticket id and SUBMITTED status
+  GW-->>Reporter: 201 ticket created
+
+  opt Automatic routing enabled
+    Note over Auto,PG: Worker polls every 2 s and leases a due job
+    Auto->>PG: Claim routing job and load ticket
+    PG-->>Auto: Ticket category and lease token
+    Auto->>Dept: POST /routing-rules/match with category and 3 s timeout
+    alt Exactly one enabled rule matches
+      Dept-->>Auto: MATCHED with department and rule id
+      Auto->>PG: Transaction sets ASSIGNED and writes history plus outbox
+      Auto->>PG: Mark routing job DONE
+      PG-->>Auto: Commit successful
+    else No rule or ambiguous rules
+      Dept-->>Auto: NO_RULE or AMBIGUOUS_RULES
+      Auto->>PG: Keep ticket SUBMITTED and mark routing job REVIEW
+      PG-->>Auto: Review state saved
+    end
+    Note over Auto,Dept: Transient errors retry with backoff. Stale results are ignored
+  end

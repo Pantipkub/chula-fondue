@@ -6,6 +6,7 @@ import {
   Injectable,
   SetMetadata,
   UnauthorizedException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
@@ -41,7 +42,7 @@ export const CurrentUser = createParamDecorator(
 export class AuthGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
-  canActivate(context: ExecutionContext) {
+  async canActivate(context: ExecutionContext) {
     const targets = [context.getHandler(), context.getClass()];
     if (this.reflector.getAllAndOverride<boolean>('public', targets)) return true;
 
@@ -55,6 +56,18 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or expired token');
     }
     if (!user.sub || !['REPORTER', 'GUEST', 'ADMIN', 'STAFF'].includes(user.role)) throw new UnauthorizedException('Invalid token claims');
+    // Account changes take effect on the next request, including tokens issued before this upgrade.
+    if (user.role !== 'GUEST') {
+      let response: globalThis.Response;
+      try {
+        response = await fetch(`${process.env.AUTH_SERVICE_URL ?? 'http://localhost:3002'}/auth/session`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }), signal: AbortSignal.timeout(5000),
+        });
+      } catch { throw new ServiceUnavailableException('Auth Service unavailable'); }
+      if (response.status === 401) throw new UnauthorizedException('Session revoked; please sign in again');
+      if (!response.ok) throw new ServiceUnavailableException('Auth Service unavailable');
+      user = await response.json() as AuthUser;
+    }
     request.user = user;
 
     const roles = this.reflector.getAllAndOverride<Role[]>('roles', targets);
