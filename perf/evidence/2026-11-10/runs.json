@@ -1,0 +1,327 @@
+[
+  {
+    "name": "1-average",
+    "ticketsBefore": 75,
+    "summary": {
+      "schemaVersion": 1,
+      "type": "average",
+      "validationOnly": false,
+      "generatedAt": "2026-11-10T07:20:34.639Z",
+      "measurementStartedAt": "2026-11-10T07:16:19.510Z",
+      "scope": "Local gateway -> JWT/ownership -> gRPC -> PostgreSQL ticket-history reads; excludes browser, uploads, and write/event throughput.",
+      "config": {
+        "type": "average",
+        "quick": false,
+        "baselineVus": 50,
+        "stressVus": 100,
+        "peakVus": 200,
+        "warmupSeconds": 30,
+        "rampSeconds": 30,
+        "holdSeconds": 180,
+        "rampDownSeconds": 15,
+        "thinkSeconds": 0.1,
+        "reporters": 5,
+        "ticketsPerReporter": 5,
+        "p95LimitMs": 1000,
+        "errorLimit": 0.01
+      },
+      "phases": [
+        {
+          "name": "baseline",
+          "seconds": 180,
+          "vus": 50,
+          "start": 60,
+          "end": 240,
+          "measured": true,
+          "required": true,
+          "requests": 60280,
+          "requestsPerSecond": 334.8888888888889,
+          "latencyMs": {
+            "p50": 38.2851085,
+            "p95": 119.85395089999997,
+            "p99": 192.85932064,
+            "max": 445.694556
+          },
+          "errorRate": 0,
+          "invalidContentRate": 0,
+          "timeouts": 0,
+          "enoughSamples": true,
+          "validContent": true,
+          "sloPassed": true
+        }
+      ],
+      "requiredPassed": true,
+      "workloadValid": true,
+      "passed": true,
+      "overloadObserved": false,
+      "interpretation": "50 VUs is a proposed baseline, not a measurement of real production traffic."
+    },
+    "exitCode": 0,
+    "resources": [
+      {
+        "name": "fondue-load-analytics-service-1",
+        "cpuPercent": 45.71,
+        "memory": "61.45MiB",
+        "memoryBytes": 64434995.2
+      },
+      {
+        "name": "fondue-load-api-gateway-1",
+        "cpuPercent": 140.84,
+        "memory": "181.6MiB",
+        "memoryBytes": 190421401.6
+      },
+      {
+        "name": "fondue-load-auth-service-1",
+        "cpuPercent": 51.95,
+        "memory": "67.09MiB",
+        "memoryBytes": 70348963.84
+      },
+      {
+        "name": "fondue-load-department-service-1",
+        "cpuPercent": 48.84,
+        "memory": "65.72MiB",
+        "memoryBytes": 68912414.72
+      },
+      {
+        "name": "fondue-load-frontend-1",
+        "cpuPercent": 7.77,
+        "memory": "18.69MiB",
+        "memoryBytes": 19597885.44
+      },
+      {
+        "name": "fondue-load-mongo-1",
+        "cpuPercent": 121.02,
+        "memory": "324.6MiB",
+        "memoryBytes": 340367769.6
+      },
+      {
+        "name": "fondue-load-notification-service-1",
+        "cpuPercent": 43.02,
+        "memory": "61.26MiB",
+        "memoryBytes": 64235765.76
+      },
+      {
+        "name": "fondue-load-postgres-1",
+        "cpuPercent": 77.38,
+        "memory": "85.94MiB",
+        "memoryBytes": 90114621.44
+      },
+      {
+        "name": "fondue-load-rabbitmq-1",
+        "cpuPercent": 447.93,
+        "memory": "232.2MiB",
+        "memoryBytes": 243479347.2
+      },
+      {
+        "name": "fondue-load-ticket-service-1",
+        "cpuPercent": 123.67,
+        "memory": "118.6MiB",
+        "memoryBytes": 124361113.6
+      },
+      {
+        "name": "fondue-k6-1794294976412-1-average",
+        "cpuPercent": 71.85,
+        "memory": "66.07MiB",
+        "memoryBytes": 69279416.32
+      }
+    ],
+    "monitorError": null
+  },
+  {
+    "name": "1-stress",
+    "ticketsBefore": 100,
+    "summary": {
+      "schemaVersion": 1,
+      "type": "stress",
+      "validationOnly": false,
+      "generatedAt": "2026-11-10T07:31:24.415Z",
+      "measurementStartedAt": "2026-11-10T07:20:39.258Z",
+      "scope": "Local gateway -> JWT/ownership -> gRPC -> PostgreSQL ticket-history reads; excludes browser, uploads, and write/event throughput.",
+      "config": {
+        "type": "stress",
+        "quick": false,
+        "baselineVus": 50,
+        "stressVus": 100,
+        "peakVus": 200,
+        "warmupSeconds": 30,
+        "rampSeconds": 30,
+        "holdSeconds": 120,
+        "rampDownSeconds": 15,
+        "thinkSeconds": 0.1,
+        "reporters": 5,
+        "ticketsPerReporter": 5,
+        "p95LimitMs": 1000,
+        "errorLimit": 0.01
+      },
+      "phases": [
+        {
+          "name": "baseline",
+          "seconds": 120,
+          "vus": 50,
+          "start": 60,
+          "end": 180,
+          "measured": true,
+          "required": true,
+          "requests": 37478,
+          "requestsPerSecond": 312.31666666666666,
+          "latencyMs": {
+            "p50": 48.376171,
+            "p95": 146.13084415,
+            "p99": 218.4966081800001,
+            "max": 337.809628
+          },
+          "errorRate": 0,
+          "invalidContentRate": 0,
+          "timeouts": 0,
+          "enoughSamples": true,
+          "validContent": true,
+          "sloPassed": true
+        },
+        {
+          "name": "stress",
+          "seconds": 120,
+          "vus": 100,
+          "start": 210,
+          "end": 330,
+          "measured": true,
+          "required": false,
+          "requests": 45155,
+          "requestsPerSecond": 376.2916666666667,
+          "latencyMs": {
+            "p50": 141.416611,
+            "p95": 347.56103019999995,
+            "p99": 543.0209653,
+            "max": 1583.835258
+          },
+          "errorRate": 0,
+          "invalidContentRate": 0,
+          "timeouts": 0,
+          "enoughSamples": true,
+          "validContent": true,
+          "sloPassed": true
+        },
+        {
+          "name": "peak",
+          "seconds": 120,
+          "vus": 200,
+          "start": 360,
+          "end": 480,
+          "measured": true,
+          "required": false,
+          "requests": 50822,
+          "requestsPerSecond": 423.51666666666665,
+          "latencyMs": {
+            "p50": 325.83827099999996,
+            "p95": 753.7554379999997,
+            "p99": 1044.60039072,
+            "max": 1606.435696
+          },
+          "errorRate": 0,
+          "invalidContentRate": 0,
+          "timeouts": 0,
+          "enoughSamples": true,
+          "validContent": true,
+          "sloPassed": true
+        },
+        {
+          "name": "recovery",
+          "seconds": 120,
+          "vus": 50,
+          "start": 510,
+          "end": 630,
+          "measured": true,
+          "required": true,
+          "requests": 33471,
+          "requestsPerSecond": 278.925,
+          "latencyMs": {
+            "p50": 56.714144,
+            "p95": 192.00195100000002,
+            "p99": 344.10787790000023,
+            "max": 2228.443422
+          },
+          "errorRate": 0,
+          "invalidContentRate": 0,
+          "timeouts": 0,
+          "enoughSamples": true,
+          "validContent": true,
+          "sloPassed": true
+        }
+      ],
+      "requiredPassed": true,
+      "workloadValid": true,
+      "passed": true,
+      "overloadObserved": false,
+      "interpretation": "Stress/peak SLO breaches are reported, not used to stop recovery. If all levels pass, the capacity limit was not found."
+    },
+    "exitCode": 0,
+    "resources": [
+      {
+        "name": "fondue-load-analytics-service-1",
+        "cpuPercent": 82.47,
+        "memory": "63.58MiB",
+        "memoryBytes": 66668462.08
+      },
+      {
+        "name": "fondue-load-api-gateway-1",
+        "cpuPercent": 189,
+        "memory": "205.9MiB",
+        "memoryBytes": 215901798.4
+      },
+      {
+        "name": "fondue-load-auth-service-1",
+        "cpuPercent": 74.93,
+        "memory": "68.85MiB",
+        "memoryBytes": 72194457.6
+      },
+      {
+        "name": "fondue-load-department-service-1",
+        "cpuPercent": 83.57,
+        "memory": "67.48MiB",
+        "memoryBytes": 70757908.48
+      },
+      {
+        "name": "fondue-load-frontend-1",
+        "cpuPercent": 12.61,
+        "memory": "20.68MiB",
+        "memoryBytes": 21684551.68
+      },
+      {
+        "name": "fondue-load-mongo-1",
+        "cpuPercent": 121.23,
+        "memory": "333.7MiB",
+        "memoryBytes": 349909811.2
+      },
+      {
+        "name": "fondue-load-notification-service-1",
+        "cpuPercent": 54.08,
+        "memory": "63.3MiB",
+        "memoryBytes": 66374860.8
+      },
+      {
+        "name": "fondue-load-postgres-1",
+        "cpuPercent": 164.49,
+        "memory": "89.32MiB",
+        "memoryBytes": 93658808.32
+      },
+      {
+        "name": "fondue-load-rabbitmq-1",
+        "cpuPercent": 542.36,
+        "memory": "235.7MiB",
+        "memoryBytes": 247149363.2
+      },
+      {
+        "name": "fondue-load-ticket-service-1",
+        "cpuPercent": 179.4,
+        "memory": "226.8MiB",
+        "memoryBytes": 237817036.8
+      },
+      {
+        "name": "fondue-k6-1794295236488-1-stress",
+        "cpuPercent": 115.55,
+        "memory": "157.3MiB",
+        "memoryBytes": 164941004.8
+      }
+    ],
+    "monitorError": null
+  }
+]

@@ -63,6 +63,7 @@ try {
         data = { ticket, history: history(ticket) };
       } else if (url.pathname === '/api/auth/users') data = [{ id: 'user-1', email, role: 'STAFF', departmentId: departments[0].id }];
       else if (url.pathname === '/api/analytics') data = analytics;
+      else if (url.pathname === '/api/routing-rules') data = [];
       else if (url.pathname === '/api/notifications') data = [{ eventId: 'event-1', ticketId: tickets[0].id, status: 'SUBMITTED', recipientEmail: email, delivery: 'SENT', receivedAt: tickets[0].createdAt }];
       else unexpectedRequests.push(url.pathname);
       await route.fulfill({ status: data === undefined ? 500 : 200, json: data ?? { message: 'Unexpected test request' } });
@@ -104,7 +105,7 @@ try {
           assert.equal(await drawer.count(), 0);
         } else if (role === 'REPORTER') {
           await page.goto(base + `/tickets/${tickets[3].id}`);
-          await page.getByRole('button', { name: 'ขอให้แก้ไขใหม่', exact: true }).click();
+          await page.getByRole('button', { name: 'ส่งกลับแก้ไข', exact: true }).click();
           await fits(page, `reporter dialog at ${width}`);
           await page.getByRole('dialog').getByRole('button', { name: 'ยกเลิก', exact: true }).click();
         }

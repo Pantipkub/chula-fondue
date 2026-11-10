@@ -1,0 +1,49 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, Arial, sans-serif","fontSize":"15px","primaryColor":"#E7F2FB","primaryTextColor":"#17324D","primaryBorderColor":"#5798D0","lineColor":"#526777","secondaryColor":"#F0F5F8","tertiaryColor":"#FFFFFF","clusterBkg":"#F6F9FB","clusterBorder":"#9BB9D0"},"flowchart":{"curve":"basis","nodeSpacing":55,"rankSpacing":70,"htmlLabels":true}}}%%
+flowchart LR
+  subgraph ticket_service["TICKET SERVICE · NestJS container"]
+    direction TB
+    controller["TicketsController<br/><small>gRPC command handlers</small>"]
+    service["TicketsService<br/><small>Ticket lifecycle · assignment · transaction</small>"]
+    subgraph workers["BACKGROUND WORKERS"]
+      direction LR
+      routing["AutoRoutingService<br/><small>2-second worker · AUTO_ROUTING_ENABLED</small>"]
+      background["BackgroundService<br/><small>Outbox relay · auto-close worker</small>"]
+    end
+    repos["TypeORM repositories<br/><small>Ticket · History · RoutingJob · Outbox</small>"]
+
+    controller -->|Invokes workflow| service
+    service -->|Reads / writes ticket, history, routing job and outbox| repos
+    routing -->|Claims due job and ticket with lease| repos
+    routing -->|Commits match or review result| service
+    background -->|Polls outbox · retries publish| repos
+    background -->|Closes expired resolutions| service
+  end
+
+  dept["Department Service<br/><small>REST lookup · routing-rule match</small>"]
+  postgres[("PostgreSQL<br/><small>ticket · history · outbox · routing_job</small>")]
+  rabbit[("RabbitMQ<br/><small>notifications / analytics queues</small>")]
+
+  service -->|Department lookup · REST · 3 s timeout| dept
+  routing -->|Routing-rule match · REST · 3 s timeout| dept
+  repos -->|Read / write| postgres
+  background -->|Persistent event · eventId + requestId| rabbit
+
+  subgraph legend["LEGEND"]
+    direction LR
+    lcomponent["Internal component"]:::component
+    lexternal["External service"]:::external
+    lstore[("Database / broker")]:::store
+    lasync["Async publish"]:::async
+  end
+
+  classDef component fill:#DCEEFF,color:#17324D,stroke:#5798D0,stroke-width:2px
+  classDef external fill:#667784,color:#FFFFFF,stroke:#4D5F6C,stroke-width:2px
+  classDef store fill:#5D6D79,color:#FFFFFF,stroke:#43515B,stroke-width:2px
+  classDef async fill:#FFF0E5,color:#9A461F,stroke:#D87645,stroke-width:2px
+  class controller,service,routing,background,repos,lcomponent component
+  class dept,lexternal external
+  class postgres,rabbit,lstore store
+  class lasync async
+  style ticket_service fill:#F7FAFC,stroke:#7EA4C2,stroke-width:2px
+  style workers fill:#FFFFFF,stroke:#B7CAD8,stroke-width:1px
+  style legend fill:#FFFFFF,stroke:#B9C9D5,stroke-dasharray:4 3

@@ -1,4 +1,4 @@
-import { IsEmail, IsIn, IsString, IsUUID, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsString, IsUUID, MaxLength, MinLength, ValidateIf } from 'class-validator';
 
 export class CredentialsDto {
   @IsEmail()
@@ -18,4 +18,22 @@ export class CreateUserDto extends CredentialsDto {
   @ValidateIf((dto: CreateUserDto) => dto.role === 'STAFF')
   @IsUUID()
   departmentId?: string;
+}
+
+const ifSent = () => ValidateIf((_, value) => value !== undefined);
+export class UpdateUserDto {
+  @ifSent() @IsIn(['REPORTER', 'STAFF', 'ADMIN']) role?: 'REPORTER' | 'STAFF' | 'ADMIN';
+  @ifSent() @IsUUID() departmentId?: string;
+  @ifSent() @IsBoolean() active?: boolean;
+}
+export class ForgotPasswordDto {
+  @IsEmail() email: string;
+}
+export class ResetPasswordDto {
+  @IsString() @MinLength(64) @MaxLength(64) token: string;
+  @IsString() @MinLength(8) @MaxLength(128) password: string;
+}
+export class ChangePasswordDto {
+  @IsString() @MaxLength(128) currentPassword: string;
+  @IsString() @MinLength(8) @MaxLength(128) password: string;
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './department.dto.js';
 import { DepartmentsService } from './departments.service.js';
 
@@ -12,13 +12,13 @@ export class DepartmentsController {
   }
 
   @Get()
-  findAll() {
-    return this.departments.findAll();
+  findAll(@Query('includeInactive') includeInactive?: string) {
+    return this.departments.findAll(includeInactive === 'true');
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.departments.findOne(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @Query('includeInactive') includeInactive?: string) {
+    return this.departments.findOne(id, includeInactive === 'true');
   }
 
   @Put(':id')

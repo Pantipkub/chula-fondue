@@ -50,7 +50,14 @@ export class TicketsService implements OnModuleInit {
     this.broker.connect().catch((error) => this.logger.warn(`RabbitMQ not reachable yet, will retry: ${error}`));
   }
 
-  create(req: Pick<Ticket, 'category' | 'location' | 'description' | 'photoUrls' | 'reporterEmail'> & { reporterId?: string }) {
+  async findSubmission(req: { reporterId: string; submissionKey: string; submissionFingerprint: string }) {
+    const ticket = await this.tickets.findOneBy({ reporterId: req.reporterId, submissionKey: req.submissionKey });
+    if (!ticket) return {};
+    if (ticket.submissionFingerprint !== req.submissionFingerprint) throw rpcError(GrpcStatus.ABORTED, 'Submission key was already used with different content');
+    return { ticket: (await this.present([ticket]))[0] };
+  }
+
+  async create(req: Pick<Ticket, 'category' | 'location' | 'description' | 'photoUrls' | 'reporterEmail'> & { reporterId?: string; submissionKey?: string; submissionFingerprint?: string }) {
     requireFields(req, 'category', 'location', 'description', 'reporterEmail');
     const ticket = this.tickets.create({
       category: req.category,
@@ -60,7 +67,27 @@ export class TicketsService implements OnModuleInit {
       completionPhotoUrls: [],
       reporterEmail: req.reporterEmail,
       reporterId: req.reporterId ?? '',
+      submissionKey: req.submissionKey ?? '',
+      submissionFingerprint: req.submissionFingerprint ?? '',
     });
+    if (req.submissionKey) {
+      if (!UUID.test(req.submissionKey) || !req.reporterId || !/^[a-f0-9]{64}$/.test(req.submissionFingerprint ?? '')) {
+        throw rpcError(GrpcStatus.INVALID_ARGUMENT, 'Invalid submission key or fingerprint');
+      }
+      // Serialize identical submissions across workers, in the same transaction as the ticket/event.
+      const saved = await this.tickets.manager.transaction(async (manager) => {
+        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`submission:${req.reporterId}:${req.submissionKey}`]);
+        const existing = await manager.findOneBy(Ticket, { reporterId: req.reporterId, submissionKey: req.submissionKey });
+        if (existing) {
+          if (existing.submissionFingerprint !== req.submissionFingerprint) throw rpcError(GrpcStatus.ABORTED, 'Submission key was already used with different content');
+          return existing;
+        }
+        const result = await this.writeTransition(manager, ticket, 'SUBMITTED', 'Ticket created', []);
+        if (autoRoutingEnabled()) await this.resetRouting(manager, result.id);
+        return result;
+      });
+      return (await this.present([saved]))[0];
+    }
     return this.setStatus(ticket, 'SUBMITTED', 'Ticket created', undefined, async (manager, saved) => {
       if (autoRoutingEnabled()) await this.resetRouting(manager, saved.id);
     });
@@ -228,7 +255,7 @@ export class TicketsService implements OnModuleInit {
     if (!tickets.length) return [];
     const jobs = await this.tickets.manager.find(TicketRoutingJob, { where: { ticketId: In(tickets.map((ticket) => ticket.id)) } });
     const byId = new Map(jobs.map((job) => [job.ticketId, job]));
-    return tickets.map(({ departmentContactEmail: _internal, ...ticket }) => {
+    return tickets.map(({ departmentContactEmail: _internal, submissionKey: _key, submissionFingerprint: _fingerprint, ...ticket }) => {
       const job = byId.get(ticket.id);
       return { ...ticket, routingStatus: job?.state === 'PROCESSING' ? 'PENDING' : job?.state ?? 'NONE', routingReason: job?.lastReason ?? '' };
     });
@@ -265,12 +292,14 @@ export class TicketsService implements OnModuleInit {
     await manager.save(TicketHistory, { ticketId: saved.id, fromStatus, toStatus, note, changedAt: now });
     // Ticket, history and outbox commit together; no broker call is made in the business transaction.
     const recipients = [...new Set(notifyEmails.filter(Boolean))];
-    const { departmentContactEmail: _internal, ...publicTicket } = saved;
+    const { departmentContactEmail: _internal, submissionKey: _key, submissionFingerprint: _fingerprint, ...publicTicket } = saved;
     for (const [index, recipientEmail] of (recipients.length ? recipients : ['']).entries()) {
       const eventId = randomUUID();
       await manager.save(OutboxEvent, {
         id: eventId, createdAt: now, notificationSent: !recipientEmail, analyticsSent: index !== 0,
-        payload: { ...publicTicket, eventId, requestId, ticketId: saved.id, recipientEmail, changedAt: now, note, fromStatus },
+        payload: { ...publicTicket, eventId, requestId, ticketId: saved.id, recipientEmail,
+          recipientDepartmentId: recipientEmail && recipientEmail === saved.departmentContactEmail ? saved.departmentId : '',
+          changedAt: now, note, fromStatus },
       });
     }
     return saved;

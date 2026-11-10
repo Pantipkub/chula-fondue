@@ -5,6 +5,16 @@ import { aggregate } from '../services/analytics-service/dist/analytics.js';
 import { AuthRateLimit } from '../services/api-gateway/dist/rate-limit.js';
 import { GmailClient, rawMessage } from '../services/notification-service/dist/email.service.js';
 
+test('recovery mail contains a single-use link in plain text and escaped HTML', () => {
+  const event = { kind: 'PASSWORD_RESET', eventId: 'recovery-test', recipientEmail: 'reporter@example.com',
+    resetUrl: 'https://example.com/reset-password?token=abc&next=%22', expiresAt: new Date().toISOString() };
+  const message = Buffer.from(rawMessage(event, 'sender@example.com'), 'base64url').toString();
+  const html = message.split('Content-Type: text/html; charset=UTF-8')[1].split('\r\n\r\n')[1].split('\r\n--')[0];
+  assert.match(Buffer.from(html.replace(/\r\n/g, ''), 'base64').toString(), /token=abc&amp;next/);
+  assert.match(message, /Content-Type: text\/plain; charset=UTF-8/);
+  assert.throws(() => rawMessage({ ...event, recipientEmail: 'x@example.com\r\nBcc: injected@example.com' }, 'sender@example.com'));
+});
+
 test('MTTR uses resolvedAt; confirmation delay cannot inflate it', () => {
   const result = aggregate([{ ticketId: 'one', version: 3, category: 'Electrical', location: 'Engineering', departmentId: 'd', departmentName: 'Facilities', status: 'CLOSED', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-10T00:00:00Z', resolvedAt: '2026-01-01T02:00:00Z' }]);
   assert.equal(result.mttrHours, 2);
@@ -46,7 +56,10 @@ test('HTML email escapes user text, and offers a plain-text part', () => {
   assert.match(raw, /Content-Type: text\/html; charset=UTF-8/);
   const department = decode(rawMessage({ ...base, status: 'ASSIGNED', recipientEmail: 'facilities@example.com' }, 'sender@example.com'));
   assert.ok(!department.includes('<img src=x'), 'description must be escaped');
-  assert.match(department, /มีเรื่องแจ้งซ่อมส่งถึงหน่วยงานของคุณ/);
+  assert.match(department, /มีงานแจ้งซ่อมใหม่ถึงหน่วยงานของคุณ/);
+  assert.match(raw, /Content-ID: <logo@chula-fondue>/, 'logo travels as an inline attachment');
+  assert.match(department, /src="cid:logo@chula-fondue"/);
+  assert.match(department, /\/staff\/tickets\/abcd1234-/, 'department button opens the staff work page');
   const guest = decode(rawMessage({ ...base, status: 'REJECTED', reason: 'duplicate', recipientEmail: 'reporter@example.com' }, 'sender@example.com'));
   assert.match(guest, /duplicate/);
 });

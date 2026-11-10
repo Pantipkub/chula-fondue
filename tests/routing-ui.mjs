@@ -26,16 +26,16 @@ try {
   const original = rules.find(r => r.category === 'IT / Network' && r.enabled);
   assert.ok(original, 'Seed an enabled IT rule first');
   try {
-    const toggle = page.getByRole('checkbox', { name: 'เปิดใช้กฎไอที / เน็ต', exact: true });
+    const toggle = page.getByRole('checkbox', { name: 'เปิดส่งต่ออัตโนมัติ ไอที / เครือข่าย', exact: true });
     await toggle.uncheck();
-    await page.getByRole('button', { name: 'บันทึกไอที / เน็ต', exact: true }).click();
-    await page.getByText('บันทึกกฎไอที / เน็ตแล้ว', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'บันทึกไอที / เครือข่าย', exact: true }).click();
+    await page.getByText('บันทึกหมวดไอที / เครือข่ายแล้ว', { exact: true }).waitFor();
     await page.reload();
     await toggle.waitFor();
     assert.equal(await toggle.isChecked(), false, 'disabled rule persists after reload');
     await toggle.check();
-    await page.getByRole('button', { name: 'บันทึกไอที / เน็ต', exact: true }).click();
-    await page.getByText('บันทึกกฎไอที / เน็ตแล้ว', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'บันทึกไอที / เครือข่าย', exact: true }).click();
+    await page.getByText('บันทึกหมวดไอที / เครือข่ายแล้ว', { exact: true }).waitFor();
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 950 });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
@@ -61,17 +61,17 @@ try {
     await route.fulfill({ response, json: body });
   });
   await report.goto(base + '/report');
-  await report.getByRole('radio', { name: 'ไอที / เน็ต', exact: true }).click();
+  await report.getByRole('radio', { name: 'ไอที / เครือข่าย', exact: true }).click();
   await report.locator('#desc').fill('ทดสอบส่งต่ออัตโนมัติจากมือถือ');
   await report.locator('#building').fill('อาคารวิศวกรรมศาสตร์ 1');
   await report.locator('input[type=file]').setInputFiles({ name: 'issue.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aSTsAAAAASUVORK5CYII=', 'base64') });
   await report.locator('button[type=submit]').click();
   await report.waitForURL(/\/report\/done\/[a-f0-9-]+$/);
-  await report.getByRole('status').filter({ hasText: 'ระบบมอบหมายอัตโนมัติ' }).waitFor({ timeout: 20000 });
+  await report.getByRole('status').filter({ hasText: 'ส่งต่ออัตโนมัติ' }).waitFor({ timeout: 20000 });
   assert.ok(historyReads >= 3, 'polling recovers after a failed read');
   await report.getByRole('button', { name: 'ติดตามสถานะ', exact: true }).click();
-  await report.getByRole('button', { name: 'ยกเลิกเรื่อง', exact: true }).waitFor();
-  assert.ok(await report.getByText('ระบบมอบหมายอัตโนมัติ', { exact: true }).count(), 'timeline identifies automatic routing');
+  await report.getByRole('button', { name: 'ยกเลิกการแจ้งซ่อม', exact: true }).waitFor();
+  assert.ok(await report.getByText('ส่งต่ออัตโนมัติ', { exact: true }).count(), 'timeline identifies automatic routing');
   assert.equal(await report.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
   await report.screenshot({ path: 'test-results/routing-mobile-assigned.png', fullPage: true });
   assert.deepEqual(errors, []);

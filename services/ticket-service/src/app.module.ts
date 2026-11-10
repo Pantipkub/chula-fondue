@@ -9,6 +9,7 @@ import { TicketsController } from './tickets.controller.js';
 import { TicketsService } from './tickets.service.js';
 import { TicketRoutingJob } from './ticket-routing-job.entity.js';
 import { AutoRoutingService } from './auto-routing.service.js';
+import { DepartmentUsageController } from './department-usage.controller.js';
 
 @Module({
   imports: [
@@ -43,7 +44,7 @@ import { AutoRoutingService } from './auto-routing.service.js';
       },
     ]),
   ],
-  controllers: [HealthController, TicketsController],
+  controllers: [HealthController, TicketsController, DepartmentUsageController],
   providers: [TicketsService, BackgroundService, AutoRoutingService],
 })
 export class AppModule {}

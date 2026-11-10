@@ -1,0 +1,35 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, Arial, sans-serif","fontSize":"16px","primaryColor":"#DCEEFF","primaryTextColor":"#17324D","primaryBorderColor":"#4B8CCB","lineColor":"#526777","secondaryColor":"#EEF4F8","tertiaryColor":"#FFFFFF","clusterBkg":"#F5F9FC","clusterBorder":"#9BB9D0"},"flowchart":{"curve":"basis","nodeSpacing":55,"rankSpacing":75,"htmlLabels":true}}}%%
+flowchart LR
+  reporter["Campus Reporter<br/><small>Signed-in · submit and track tickets</small>"]
+  staff["Department Staff<br/><small>Process assigned tickets · resolve</small>"]
+  admin["Administrator<br/><small>Assign tickets · manage system</small>"]
+
+  subgraph system["CHULA FONDUE · Campus issue reporting and repair"]
+    direction TB
+    app["Chula Fondue System<br/><small>Report · route · track · resolve campus issues</small>"]
+  end
+
+  cloud["Cloudinary<br/><small>Optional photo storage</small>"]
+  gmail["Gmail API<br/><small>Optional email delivery</small>"]
+
+  reporter -->|Submit · track · cancel| app
+  staff -->|Process assigned tickets · resolve| app
+  admin -->|Assign tickets · manage accounts and departments| app
+  app -.->|Optional photo upload · HTTPS| cloud
+  app -.->|Optional ticket and recovery email · HTTPS| gmail
+
+  subgraph legend["LEGEND"]
+    direction LR
+    lperson["Person"]:::person
+    lsystem["System"]:::system
+    lexternal["External system"]:::external
+  end
+
+  classDef person fill:#164B78,color:#FFFFFF,stroke:#123B60,stroke-width:2px
+  classDef system fill:#1676C5,color:#FFFFFF,stroke:#105A98,stroke-width:3px
+  classDef external fill:#667784,color:#FFFFFF,stroke:#4D5F6C,stroke-width:2px
+  class reporter,staff,admin,lperson person
+  class app,lsystem system
+  class cloud,gmail,lexternal external
+  style system fill:#F3F8FC,stroke:#4B8CCB,stroke-width:2px
+  style legend fill:#FFFFFF,stroke:#B9C9D5,stroke-dasharray:4 3

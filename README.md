@@ -33,6 +33,12 @@ Staff สาธิตสังกัดงานอาคารและสถ�
 - Analytics Service: MTTR จากเวลาแก้ไขเสร็จจริง, สถิติตามหมวด/หน่วยงาน/ช่วงวัน และจุดที่แจ้งบ่อย
 - Notification ผ่าน transactional outbox + RabbitMQ เก็บใน MongoDB พร้อมหน้าแสดงประวัติ; ส่ง Gmail ได้เมื่อตั้งค่า OAuth
 - JWT/RBAC, ownership checks, rate limit, concurrency checks, request IDs, health/readiness และ persistent photo storage
+- แจ้งเตือน Staff ตามหน่วยงาน พร้อมอ่านแล้วแยกแต่ละบัญชีและลิงก์เปิดคำร้อง
+- Admin เปลี่ยนบทบาท/ย้ายหน่วยงาน/เปิดปิดบัญชี; ผู้ใช้เปลี่ยนหรือกู้รหัสผ่านได้ พร้อมยกเลิก token เดิม
+- ปิดใช้งานหน่วยงานโดยเก็บประวัติ และตรวจงานค้าง/Staff/กฎก่อนปิด
+- ส่งคำร้องซ้ำด้วย `Idempotency-Key` เดิมได้โดยไม่สร้างเรื่องซ้ำ
+
+รายละเอียดพฤติกรรมและ API เพิ่มเติม: [Platform hardening](docs/platform-hardening.md)
 
 ## โครงสร้าง
 
@@ -56,6 +62,10 @@ Gateway ใช้ได้ที่ http://localhost:3100 เมื่อใช�
 npm test
 npm run test:e2e
 npm run test:recovery
+npm run test:platform
+npm run test:platform:e2e
+# ตรวจฟีเจอร์ใหม่ใน browser (macOS ใช้ Chrome; Linux ตั้ง BROWSER_CHANNEL=chromium)
+npm run test:platform:ui
 # หลังเปิด auto-routing และ seed กฎแล้ว
 npm run test:routing
 npm run test:routing:recovery
@@ -68,6 +78,21 @@ npm run test:ui
 สำหรับ UI ของ Compose ตั้ง `WEB_URL=http://127.0.0.1:8080`. บน Linux ให้ติดตั้ง Playwright Chromium และตั้ง `BROWSER_CHANNEL=chromium`. ผลทดสอบและภาพหน้าจออยู่ `test-results/`. `test:recovery` หยุด/เริ่ม RabbitMQ เฉพาะ project `fondue-demo` และปรับวันที่ข้อมูล fixture เพื่อทดสอบปิดงานอัตโนมัติ. ห้ามใช้ script นี้กับ deployment จริง.
 
 CI รัน build, unit, API, broker recovery และ responsive UI checks แล้วเก็บ evidence. ต้องดูผล CI จริงก่อนอ้างว่าผ่าน.
+
+## Load testing
+
+ทดสอบ Average load (50 VUs) และ Stress (50 → 100 → 200 → 50 VUs) ผ่าน gateway ด้วย k6 บน Docker:
+
+```powershell
+npm run test:load
+npm run test:stress
+# รันทั้งสองประเภท พร้อมบันทึก CPU/RAM และรายงานผล
+npm run test:perf
+# ตรวจ script แบบสั้น ผลนี้ไม่ใช้สรุป performance
+npm run test:perf -- --quick
+```
+
+ต้องเปิด Compose project `fondue-demo` และมี image `grafana/k6:1.8.2` ก่อน (`docker pull grafana/k6:1.8.2`). ผลแต่ละรอบอยู่ใน `test-results/load/`; เปิด `report.html` เพื่อดูกราฟแยก Average-load / Stress ดู [วิธีรันและตัวเลือก](docs/load-testing.md). การทดสอบสร้างบัญชีและคำร้องสำหรับ fixture ในฐานข้อมูล local; ไม่ล้างข้อมูลเดิม.
 
 ## เปิดการส่งต่ออัตโนมัติ
 
