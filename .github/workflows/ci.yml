@@ -7,6 +7,7 @@ jobs:
     timeout-minutes: 25
     env:
       AUTO_ROUTING_ENABLED: 'true'
+      AUTH_RATE_LIMIT: '300' # Higher only for automated fixture creation in the isolated demo.
     steps:
       - run: uname -a
       - uses: actions/checkout@v4
@@ -22,6 +23,8 @@ jobs:
         env:
           ROUTING_TEST_DATABASE_URL: postgresql://fondue:fondue@127.0.0.1:5435/ticket
       - run: npm run test:e2e
+      - run: npm run test:platform
+      - run: npm run test:platform:e2e
       - run: npm run test:recovery
       - run: npm run seed:demo
       - run: npm run test:routing
@@ -32,6 +35,14 @@ jobs:
           WEB_URL: http://127.0.0.1:8080
           BROWSER_CHANNEL: chromium
       - run: npm run test:ui:live
+        env:
+          WEB_URL: http://127.0.0.1:8080
+          BROWSER_CHANNEL: chromium
+      - run: npm run test:platform:ui
+        env:
+          WEB_URL: http://127.0.0.1:8080
+          BROWSER_CHANNEL: chromium
+      - run: npm run test:ui:auth-tabs
         env:
           WEB_URL: http://127.0.0.1:8080
           BROWSER_CHANNEL: chromium

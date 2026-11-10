@@ -56,7 +56,8 @@ export function TopNav() {
             </button>
             {menu && (
               <div className="card" style={{ position: 'absolute', right: 0, top: 50, padding: 8, minWidth: 200, zIndex: 30 }}>
-                <button className="btn ghost block" style={{ justifyContent: 'flex-start' }} onClick={() => { logout(); nav('/'); }}><Icon name="logout" />ออกจากระบบ</button>
+                <Link to="/account" className="btn ghost block" onClick={() => setMenu(false)}>ตั้งค่าบัญชี</Link>
+                <button className="btn ghost block" style={{ justifyContent: 'flex-start' }} onClick={async () => { await logout(); nav('/'); }}><Icon name="logout" />ออกจากระบบ</button>
               </div>
             )}
           </div>
@@ -108,13 +109,14 @@ export function AppShell({ role, counts = {}, search }: { role: 'ADMIN' | 'STAFF
         <div className="usercard">
           <span className="avatar" style={{ width: 36, height: 36 }}>{initials(session?.email ?? '')}</span>
           <div className="grow who"><div className="strong small" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{session?.email}</div><div className="xs muted">{role === 'ADMIN' ? 'Admin' : 'Staff'}</div></div>
-          <button className="icon-btn" aria-label="ออกจากระบบ" onClick={() => { logout(); nav('/login'); }}><Icon name="logout" /></button>
+          <button className="icon-btn" aria-label="ออกจากระบบ" onClick={async () => { await logout(); nav('/login'); }}><Icon name="logout" /></button>
         </div>
       </aside>
       <div className="main">
         <div className="topbar">
           <div className="search">{search}</div>
           <div className="row topbar-links">
+            <Link to="/account" className="small">ตั้งค่าบัญชี</Link>
             <Link to="/notifications" className="small">การแจ้งเตือน</Link><Link to="/" className="small">ดูหน้าเว็บผู้แจ้ง</Link>
             <span className={`rolechip ${role === 'ADMIN' ? 'tone-pink' : 'tone-lilac'}`}><Icon name={role === 'ADMIN' ? 'shield' : 'wrench'} size={14} />{role === 'ADMIN' ? 'Admin' : 'Staff'}</span>
           </div>

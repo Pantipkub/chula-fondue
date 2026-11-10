@@ -36,7 +36,7 @@ function RuleRow({ category, label, departments, rule, saved }: { category: stri
   }}>
     <div className="row wrap" style={{ alignItems: 'flex-end', gap: 16 }}>
       <div className="grow" style={{ minWidth: 180 }}><Select id={`rule-${category.replaceAll(/\W/g, '-')}`} label={label} value={departmentId} onChange={(e) => setDepartment(e.target.value)} required disabled={busy}>
-        <option value="">เลือกหน่วยงาน</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        <option value="">เลือกหน่วยงาน</option>{departments.filter(d => d.active !== false || d.id === departmentId).map((d) => <option key={d.id} value={d.id} disabled={d.active === false}>{d.name}{d.active === false ? ' · ปิดใช้งาน' : ''}</option>)}
       </Select></div>
       <label className="row small" style={{ minHeight: 44, gap: 8 }}><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} disabled={busy} />เปิดใช้กฎ{label}</label>
       <Button type="submit" kind="outline" busy={busy} disabled={!departmentId || !dirty}>บันทึก{label}</Button>

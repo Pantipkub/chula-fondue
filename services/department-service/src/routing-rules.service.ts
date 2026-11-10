@@ -28,7 +28,7 @@ export class RoutingRulesService {
         if (dto.departmentId !== undefined) rule.departmentId = dto.departmentId;
         if (dto.enabled !== undefined) rule.enabled = dto.enabled;
         // Serialize against deletion of this department; the active-category index handles racing writers.
-        if (!await manager.findOne(Department, { where: { id: rule.departmentId }, lock: { mode: 'pessimistic_write' } })) {
+        if (!await manager.findOne(Department, { where: { id: rule.departmentId, ...(rule.enabled && { active: true }) }, lock: { mode: 'pessimistic_write' } })) {
           throw new NotFoundException('Department not found');
         }
         return manager.save(rule);
@@ -48,6 +48,7 @@ export class RoutingRulesService {
     if (!rules.length) return { result: 'NO_RULE' as const };
     if (rules.length !== 1) return { result: 'AMBIGUOUS_RULES' as const };
     const { id: ruleId, department } = rules[0];
+    if (!department.active) return { result: 'NO_RULE' as const };
     return { result: 'MATCHED' as const, ruleId, category,
       department: { id: department.id, name: department.name, contactEmail: department.contactEmail } };
   }

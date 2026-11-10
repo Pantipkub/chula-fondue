@@ -41,7 +41,7 @@ interface FieldProps { label?: string; required?: boolean; help?: string; error?
 function Shell({ label, required, help, error, id, children }: FieldProps & { children: ReactNode }) {
   return (
     <div className="field">
-      {label && <label htmlFor={id}>{label}{required && <span className="req"> *</span>}</label>}
+      {label && <label htmlFor={id}>{label}{required && <span className="req" aria-hidden="true"> *</span>}</label>}
       {children}
       {(error || help) && <span className={`help${error ? ' error' : ''}`}>{error || help}</span>}
     </div>

@@ -39,6 +39,9 @@ export class NotificationStore {
     const collection = db.collection('notifications');
     // One record per event id (events from before Progress 3 have none, hence sparse).
     await collection.createIndex({ eventId: 1 }, { unique: true, sparse: true });
+    await collection.createIndex({ recipientDepartmentId: 1, receivedAt: -1 });
+    await collection.createIndex({ recipientEmail: 1, receivedAt: -1 });
+    await collection.createIndex({ purgeAt: 1 }, { expireAfterSeconds: 0 });
     this.logger.log('Connected to MongoDB');
     return { db, collection };
   }

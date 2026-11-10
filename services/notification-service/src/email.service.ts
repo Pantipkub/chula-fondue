@@ -1,20 +1,20 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { NotificationStore } from './notification-store.js';
 
-import { mimeMessage } from './email-template.js';
-import type { EmailEvent } from './email-template.js';
+import { mimeMessage, recoveryMessage } from './email-template.js';
+import type { EmailEvent, RecoveryEmail } from './email-template.js';
 
 export type { EmailEvent } from './email-template.js';
 /** The Gmail `raw` field: a multipart (plain text + HTML) message, base64url. */
-export function rawMessage(event: EmailEvent, from: string) {
-  return mimeMessage(event, from);
+export function rawMessage(event: EmailEvent | RecoveryEmail, from: string) {
+  return 'kind' in event ? recoveryMessage(event, from) : mimeMessage(event, from);
 }
 
 export class GmailClient {
   private token = '';
   private expires = 0;
   constructor(private readonly request: typeof fetch = fetch) {}
-  async send(event: EmailEvent) {
+  async send(event: EmailEvent | RecoveryEmail) {
     const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_FROM } = process.env;
     if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN || !GMAIL_FROM) throw new Error('Gmail credentials are not configured');
     if (Date.now() > this.expires) {
@@ -58,9 +58,13 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
         nextAttemptAt: { $lte: new Date().toISOString() },
       }, { $set: { delivery: 'SENDING', nextAttemptAt: new Date(Date.now() + 60000).toISOString() }, $inc: { attempts: 1 } }, { returnDocument: 'after' });
       if (!record) return;
+      if (record.kind === 'PASSWORD_RESET' && record.expiresAt <= new Date().toISOString()) {
+        await collection.updateOne({ _id: record._id }, { $set: { delivery: 'FAILED' }, $unset: { resetUrl: '' } });
+        return;
+      }
       try {
         const messageId = await this.gmail.send(record as unknown as EmailEvent);
-        await collection.updateOne({ _id: record._id }, { $set: { delivery: 'SENT', messageId, sentAt: new Date().toISOString() } });
+        await collection.updateOne({ _id: record._id }, { $set: { delivery: 'SENT', messageId, sentAt: new Date().toISOString() }, ...(record.kind === 'PASSWORD_RESET' && { $unset: { resetUrl: '' } }) });
       } catch (error) {
         await collection.updateOne({ _id: record._id }, { $set: {
           delivery: record.attempts >= 5 ? 'FAILED' : 'RETRY', error: (error as Error).message,
