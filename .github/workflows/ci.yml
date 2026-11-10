@@ -23,7 +23,7 @@ jobs:
         env:
           ROUTING_TEST_DATABASE_URL: postgresql://fondue:fondue@127.0.0.1:5435/ticket
       - run: npm run test:e2e
-      - run: npm run test:platform:e2e
+      - run: node --env-file-if-exists=.env.demo tests/platform-e2e.mjs
       - run: npm run test:recovery
       - run: npm run seed:demo
       - run: npm run test:routing
@@ -45,11 +45,11 @@ jobs:
         env:
           WEB_URL: http://127.0.0.1:8080
           BROWSER_CHANNEL: chromium
-      - run: npm run test:platform:ui
+      - run: node --env-file-if-exists=.env.demo tests/platform-ui.mjs
         env:
           WEB_URL: http://127.0.0.1:8080
           BROWSER_CHANNEL: chromium
-      - run: npm run test:ui:auth-tabs
+      - run: node tests/ui-auth-tabs.mjs
         env:
           WEB_URL: http://127.0.0.1:8080
           BROWSER_CHANNEL: chromium
