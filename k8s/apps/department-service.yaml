@@ -45,6 +45,11 @@ spec:
               value: "3001"
             - name: DEPARTMENT_DATABASE_URL
               value: postgresql://fondue:fondue@postgres:5432/department
+            # Before a department is deactivated: active staff (Auth) and open tickets (Ticket health port).
+            - name: AUTH_SERVICE_URL
+              value: http://auth-service:3002
+            - name: TICKET_SERVICE_HTTP_URL
+              value: http://ticket-service:8081
           ports:
             - name: http
               containerPort: 3001

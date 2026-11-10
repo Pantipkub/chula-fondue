@@ -25,6 +25,11 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "if (!pm.response || pm.response.code !== 200) {",
+                  "  pm.test('gateway reachable at ' + pm.environment.get('baseUrl') + ' (wrong environment or system not running?)', () => pm.expect.fail('no answer; run stopped'));",
+                  "  (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(null) : postman.setNextRequest(null);",
+                  "  return;",
+                  "}",
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
                   "pm.test('status ok', () => pm.expect(body.status).to.eql('ok'));"
@@ -102,9 +107,11 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code !== 200) { pm.test('admin login works (check adminEmail / adminPassword in the environment)', () => pm.expect.fail('login failed; run stopped')); (pm.execution && pm.execution.setNextRequest) ? pm.execution.setNextRequest(null) : postman.setNextRequest(null); return; }",
                   "const body = pm.response.json();",
                   "pm.test('admin token issued', () => pm.expect(body.user.role).to.eql('ADMIN'));",
-                  "pm.collectionVariables.set('adminToken', body.accessToken);"
+                  "pm.collectionVariables.set('adminToken', body.accessToken);",
+                  "pm.collectionVariables.set('adminId', body.user.id);"
                 ]
               }
             }
@@ -290,7 +297,8 @@
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
                   "pm.collectionVariables.set('reporterToken', body.accessToken);",
-                  "pm.collectionVariables.set('reporterEmail', body.user.email);"
+                  "pm.collectionVariables.set('reporterEmail', body.user.email);",
+                  "pm.collectionVariables.set('reporterPassword', pm.environment.get('testPassword'));"
                 ]
               }
             }
@@ -751,7 +759,8 @@
                 "exec": [
                   "pm.test('status 201', () => pm.response.to.have.status(201));",
                   "const body = pm.response.json();",
-                  "pm.test('STAFF in department', () => { pm.expect(body.role).to.eql('STAFF'); pm.expect(body.departmentId).to.eql(pm.collectionVariables.get('deptId')); });"
+                  "pm.collectionVariables.set('staffId', body.id);",
+                  "pm.test('STAFF in department, active', () => { pm.expect(body.role).to.eql('STAFF'); pm.expect(body.departmentId).to.eql(pm.collectionVariables.get('deptId')); pm.expect(body.active).to.eql(true); });"
                 ]
               }
             }
@@ -899,6 +908,770 @@
           ]
         }
       ]
+    },
+    {
+      "name": "03b Accounts: sessions, password and access",
+      "item": [
+        {
+          "name": "Change password with wrong current password -> 401",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reporterToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"not-my-password\",\n  \"password\": \"PostmanNew!2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change password too short -> 400",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reporterToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{reporterPassword}}\",\n  \"password\": \"123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reporter changes password",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reporterToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{reporterPassword}}\",\n  \"password\": \"PostmanNew!2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('oldReporterToken', pm.collectionVariables.get('reporterToken'));",
+                  "pm.collectionVariables.set('reporterPassword', 'PostmanNew!2026');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Old token is revoked after password change -> 401",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{oldReporterToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Old password no longer works -> 401",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{reporterEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reporter signs in again",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{reporterEmail}}\",\n  \"password\": \"{{reporterPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('reporterToken', body.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reporter logs out",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reporterToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('oldReporterToken', pm.collectionVariables.get('reporterToken'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token after logout -> 401",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{oldReporterToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reporter signs in again",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{reporterEmail}}\",\n  \"password\": \"{{reporterPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('reporterToken', body.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forgot password (existing account) -> generic 200",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/forgot-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{reporterEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('forgotMessage', body.message);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forgot password (unknown email) -> same answer",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/forgot-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nobody-{{runId}}@example.test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('does not reveal whether the account exists', () => pm.expect(body.message).to.eql(pm.collectionVariables.get('forgotMessage')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset password with an unknown token -> 400",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"password\": \"PostmanNew!2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset password with a malformed token -> 400",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"short\",\n  \"password\": \"PostmanNew!2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin cannot disable own account -> 409",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/users/{{adminId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reporter cannot manage users -> 403",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reporterToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/users/{{staffId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin disables staff",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/users/{{staffId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('inactive', () => pm.expect(body.active).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Disabled staff token -> 401",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/tickets"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Disabled staff cannot sign in -> 401",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"staff-{{runId}}@example.test\",\n  \"password\": \"{{testPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin enables staff",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/users/{{staffId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('active again', () => pm.expect(body.active).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Staff signs in again",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"staff-{{runId}}@example.test\",\n  \"password\": \"{{testPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('staffToken', body.accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Tokens carry a version; changing password, logging out, or an admin changing role/department/active state revokes old tokens on the next request."
     },
     {
       "name": "04 Routing rules (admin)",
@@ -1860,6 +2633,261 @@
       ]
     },
     {
+      "name": "05b Idempotent submission (Idempotency-Key)",
+      "item": [
+        {
+          "name": "Report with Idempotency-Key",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reporterToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{submissionKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/tickets",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "category",
+                  "value": "Other",
+                  "type": "text"
+                },
+                {
+                  "key": "location",
+                  "value": "Postman test room",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Postman idempotent {{runId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "photos",
+                  "type": "file",
+                  "src": "demo-progress2/photos/issue-1.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('submissionKey', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('idemTicket', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Same key + same content -> same ticket (no duplicate)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reporterToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{submissionKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/tickets",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "category",
+                  "value": "Other",
+                  "type": "text"
+                },
+                {
+                  "key": "location",
+                  "value": "Postman test room",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Postman idempotent {{runId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "photos",
+                  "type": "file",
+                  "src": "demo-progress2/photos/issue-1.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is one of [200, 201]', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns the first ticket', () => pm.expect(body.id).to.eql(pm.collectionVariables.get('idemTicket')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Same key + different content -> 409",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reporterToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{submissionKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/tickets",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "category",
+                  "value": "Other",
+                  "type": "text"
+                },
+                {
+                  "key": "location",
+                  "value": "Postman test room",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Different text {{runId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "photos",
+                  "type": "file",
+                  "src": "demo-progress2/photos/issue-1.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Malformed Idempotency-Key -> 400",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reporterToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "not-a-uuid"
+              }
+            ],
+            "url": "{{baseUrl}}/tickets",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "category",
+                  "value": "Other",
+                  "type": "text"
+                },
+                {
+                  "key": "location",
+                  "value": "Postman test room",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Postman idempotent {{runId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "photos",
+                  "type": "file",
+                  "src": "demo-progress2/photos/issue-1.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "A retried submission (double click, flaky network) must not create a second ticket."
+    },
+    {
       "name": "06 Reject and cancel",
       "item": [
         {
@@ -2475,7 +3503,7 @@
           ]
         },
         {
-          "name": "Ticket is routed by rule (waits 8 s)",
+          "name": "Ticket is routed by rule (polls until routed)",
           "request": {
             "method": "GET",
             "auth": {
@@ -2497,7 +3525,17 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "setTimeout(() => {}, 8000); // the worker runs every 2 s"
+                  "const url = pm.environment.get('baseUrl') + '/tickets/' + pm.collectionVariables.get('autoTicket') + '/history';",
+                  "const token = pm.collectionVariables.get('adminToken');",
+                  "const deadline = Date.now() + 15000;",
+                  "const settled = (json, code) => { try { return code === 200 && !['PENDING', 'RETRY'].includes(json.ticket.routingStatus); } catch (e) { return false; } };",
+                  "(function poll() {",
+                  "  pm.sendRequest({ url, method: 'GET', header: { Authorization: 'Bearer ' + token } }, (err, res) => {",
+                  "    let json = null; try { json = res.json(); } catch (e) {}",
+                  "    if (!err && settled(json, res.code)) return;",
+                  "    if (Date.now() < deadline) setTimeout(poll, 1500);",
+                  "  });",
+                  "})();"
                 ]
               }
             },
@@ -2575,7 +3613,7 @@
           ]
         },
         {
-          "name": "No rule -> admin review queue (waits 6 s)",
+          "name": "No rule -> admin review queue (polls until routed)",
           "request": {
             "method": "GET",
             "auth": {
@@ -2597,7 +3635,17 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "setTimeout(() => {}, 6000);"
+                  "const url = pm.environment.get('baseUrl') + '/tickets/' + pm.collectionVariables.get('reviewTicket') + '/history';",
+                  "const token = pm.collectionVariables.get('adminToken');",
+                  "const deadline = Date.now() + 15000;",
+                  "const settled = (json, code) => { try { return code === 200 && !['PENDING', 'RETRY'].includes(json.ticket.routingStatus); } catch (e) { return false; } };",
+                  "(function poll() {",
+                  "  pm.sendRequest({ url, method: 'GET', header: { Authorization: 'Bearer ' + token } }, (err, res) => {",
+                  "    let json = null; try { json = res.json(); } catch (e) {}",
+                  "    if (!err && settled(json, res.code)) return;",
+                  "    if (Date.now() < deadline) setTimeout(poll, 1500);",
+                  "  });",
+                  "})();"
                 ]
               }
             },
@@ -2822,7 +3870,17 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "setTimeout(() => {}, 3000); // events travel outbox -> RabbitMQ -> MongoDB"
+                  "const url = pm.environment.get('baseUrl') + '/notifications';",
+                  "const token = pm.collectionVariables.get('adminToken');",
+                  "const deadline = Date.now() + 10000;",
+                  "const settled = (json, code) => { try { return code === 200 && json.some(n => n.ticketId === pm.collectionVariables.get('ticketId')); } catch (e) { return false; } };",
+                  "(function poll() {",
+                  "  pm.sendRequest({ url, method: 'GET', header: { Authorization: 'Bearer ' + token } }, (err, res) => {",
+                  "    let json = null; try { json = res.json(); } catch (e) {}",
+                  "    if (!err && settled(json, res.code)) return;",
+                  "    if (Date.now() < deadline) setTimeout(poll, 1500);",
+                  "  });",
+                  "})();"
                 ]
               }
             },
@@ -2834,6 +3892,129 @@
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
                   "pm.test('lifecycle notifications recorded', () => pm.expect(body.map(n => n.ticketId)).to.include(pm.collectionVariables.get('ticketId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Staff sees department notifications",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/notifications",
+            "description": "Assignment mail goes to the department contact address; staff see it through their department."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const mine = body.filter(n => n.ticketId === pm.collectionVariables.get('ticketId') && n.status === 'ASSIGNED');",
+                  "pm.test('assignment of the lifecycle ticket is visible', () => pm.expect(mine).to.not.be.empty);",
+                  "if (mine[0]) pm.collectionVariables.set('noticeId', mine[0].eventId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Staff marks it read",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/notifications/{{noticeId}}/read"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read flag is per viewer",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/notifications"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('marked read', () => pm.expect(body.find(n => n.eventId === pm.collectionVariables.get('noticeId')).read).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark unknown notification -> 404",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/notifications/not-a-real-event/read"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
                 ]
               }
             }
@@ -3182,10 +4363,10 @@
       ]
     },
     {
-      "name": "11 Cleanup",
+      "name": "11 Department deactivation and cleanup",
       "item": [
         {
-          "name": "Delete test department",
+          "name": "Delete department with active staff -> 409",
           "request": {
             "method": "DELETE",
             "auth": {
@@ -3199,8 +4380,254 @@
               ]
             },
             "header": [],
-            "url": "{{baseUrl}}/departments/{{deptId}}",
-            "description": "Its routing rule is disabled, so deletion is allowed; the rule is removed with it."
+            "url": "{{baseUrl}}/departments/{{deptId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "const body = pm.response.json();",
+                  "pm.test('explains active staff', () => pm.expect(String(body.message)).to.match(/staff/i));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin disables staff",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/users/{{staffId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report ticket D",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{reporterToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/tickets",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "category",
+                  "value": "Other",
+                  "type": "text"
+                },
+                {
+                  "key": "location",
+                  "value": "Postman test room",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Postman open work {{runId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "photos",
+                  "type": "file",
+                  "src": "demo-progress2/photos/issue-1.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('ticketD', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assign D to the department (open work)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/tickets/{{ticketD}}/assign",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"departmentId\": \"{{deptId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete department with open tickets -> 409",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/departments/{{deptId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "const body = pm.response.json();",
+                  "pm.test('explains open tickets', () => pm.expect(String(body.message)).to.match(/open tickets/i));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin rejects D (closes the open work)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/tickets/{{ticketD}}/reject",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Postman cleanup\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete (deactivate) department",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/departments/{{deptId}}"
           },
           "event": [
             {
@@ -3215,7 +4642,7 @@
           ]
         },
         {
-          "name": "Deleted department -> 404",
+          "name": "Inactive department hidden -> 404",
           "request": {
             "method": "GET",
             "auth": {
@@ -3242,8 +4669,157 @@
               }
             }
           ]
+        },
+        {
+          "name": "Inactive department kept for history (includeInactive)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/departments/{{deptId}}?includeInactive=true"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('kept, inactive', () => pm.expect(body.active).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List excludes inactive by default",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/departments"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('not listed', () => pm.expect(body.map(d => d.id)).to.not.include(pm.collectionVariables.get('deptId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assign to inactive department -> 404",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/tickets/{{reviewTicket}}/assign",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"departmentId\": \"{{deptId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create staff in inactive department -> 400",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/users",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"late-{{runId}}@example.test\",\n  \"password\": \"{{testPassword}}\",\n  \"role\": \"STAFF\",\n  \"departmentId\": \"{{deptId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
         }
-      ]
+      ],
+      "description": "Departments are deactivated, never hard-deleted, and only when no active staff or open tickets depend on them."
     }
   ],
   "event": [
@@ -3267,11 +4843,27 @@
       "value": ""
     },
     {
+      "key": "adminId",
+      "value": ""
+    },
+    {
       "key": "reporterToken",
       "value": ""
     },
     {
+      "key": "oldReporterToken",
+      "value": ""
+    },
+    {
       "key": "reporterEmail",
+      "value": ""
+    },
+    {
+      "key": "reporterPassword",
+      "value": ""
+    },
+    {
+      "key": "forgotMessage",
       "value": ""
     },
     {
@@ -3280,6 +4872,10 @@
     },
     {
       "key": "staffToken",
+      "value": ""
+    },
+    {
+      "key": "staffId",
       "value": ""
     },
     {
@@ -3292,6 +4888,22 @@
     },
     {
       "key": "ruleId",
+      "value": ""
+    },
+    {
+      "key": "submissionKey",
+      "value": ""
+    },
+    {
+      "key": "idemTicket",
+      "value": ""
+    },
+    {
+      "key": "ticketD",
+      "value": ""
+    },
+    {
+      "key": "noticeId",
       "value": ""
     },
     {

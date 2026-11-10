@@ -46,6 +46,14 @@ spec:
               value: "3002"
             - name: AUTH_DATABASE_URL
               value: postgresql://fondue:fondue@postgres:5432/auth
+            # Staff accounts are checked against Department Service; recovery mail goes through Notification Service.
+            - name: DEPARTMENT_SERVICE_URL
+              value: http://department-service:3001
+            - name: NOTIFICATION_SERVICE_URL
+              value: http://notification-service:8082
+            # Password-reset links point at the web app as reached on this cluster (Tilt port-forward 8090).
+            - name: WEB_PUBLIC_URL
+              value: http://localhost:8090
           ports:
             - name: http
               containerPort: 3002

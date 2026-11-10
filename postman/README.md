@@ -1,6 +1,6 @@
 # Postman: ทดสอบทุก API ผ่าน API Gateway
 
-`chula-fondue.postman_collection.json` มี 86 requests / 215 assertions ครอบคลุมทุก endpoint ของ gateway ทั้งกรณีปกติ สิทธิ์ (401/403) validation (400) สถานะไม่ถูกต้อง (409) และไม่พบข้อมูล (404) แต่ละรอบสร้าง reporter, staff, หน่วยงาน และ ticket ของตัวเองด้วย `runId` จึงรันซ้ำได้โดยไม่ชนข้อมูลเดิม
+`chula-fondue.postman_collection.json` มี 124 requests / 301 assertions ครอบคลุมทุก endpoint ของ gateway ทั้งกรณีปกติ สิทธิ์ (401/403) validation (400) สถานะไม่ถูกต้อง (409) และไม่พบข้อมูล (404) แต่ละรอบสร้าง reporter, staff, หน่วยงาน และ ticket ของตัวเองด้วย `runId` จึงรันซ้ำได้โดยไม่ชนข้อมูลเดิม
 
 ## ก่อนรัน
 
@@ -33,22 +33,27 @@ npx newman run postman/chula-fondue.postman_collection.json \
 
 | Folder | ครอบคลุม |
 |---|---|
-| 00 Health | `/health`, `/health/ready` |
+| 00 Health | `/health`, `/health/ready` (ต่อไม่ได้จะหยุดทันที ไม่รันต่อ) |
 | 01 Auth | login, register, guest token, `/auth/me`, token ผิด/ไม่มี |
 | 02 Departments | CRUD + ชื่อซ้ำ, อีเมลผิด, 404, สิทธิ์ |
 | 03 Users | สร้าง staff, หน่วยงานไม่มีจริง, list users, login staff |
+| 03b Accounts | เปลี่ยนรหัสผ่าน (token เก่าใช้ไม่ได้), logout, ลืมรหัสผ่าน (ไม่บอกว่ามีบัญชีไหม), reset token ผิด, admin ปิด/เปิดบัญชี staff, ห้ามปิดบัญชีตัวเอง |
 | 04 Routing rules | list, create (ปิดไว้), update, หมวดไม่รองรับ, `/routing-rules/match` |
 | 05 Ticket lifecycle | แจ้ง + รูป → assign → start → resolve → reopen → resolve → confirm + ตรวจ history ครบทุกขั้น และรูปถูกเสิร์ฟจริง |
+| 05b Idempotent submission | `Idempotency-Key` เดิม + เนื้อหาเดิมได้เรื่องเดิม, เนื้อหาต่าง 409, key ผิดรูปแบบ 400 |
 | 06 Reject and cancel | reject (ต้องมีเหตุผล), filter สถานะ, cancel, includeCancelled |
-| 07 Guest token | guest ส่งเรื่อง/อ่าน/list/cancel ไม่ได้ (ต้อง login ตั้งแต่ commit c1e7997) |
-| 08 Automatic routing | IT / Network ถูกส่งต่อเองตามกฎ, "Other" เข้าคิว admin (NO_RULE), retry-routing |
-| 09 Analytics and notifications | report + filter + วันที่ผิด, notifications ของ admin / reporter |
+| 07 Guest token | guest ส่งเรื่อง/อ่าน/list/cancel ไม่ได้ |
+| 08 Automatic routing | IT / Network ถูกส่งต่อเองตามกฎ, "Other" เข้าคิว admin (NO_RULE), retry-routing (poll ทุก 1.5 วิ ไม่รอเงียบ จึงไม่เจอ socket hang up) |
+| 09 Analytics and notifications | report + filter + วันที่ผิด, notifications ของ admin / staff (ตามหน่วยงาน) / reporter, mark read |
 | 10 Validation and errors | ไม่มีรูป, ไฟล์ไม่ใช่รูป, ขาดรายละเอียด, id ผิด, staff assign ไม่ได้ |
-| 11 Cleanup | ลบหน่วยงานทดสอบ |
+| 11 Department deactivation | ลบไม่ได้ถ้ามี staff active หรืองานค้าง (409), ลบ = ปิดใช้งาน, `includeInactive`, assign/สร้าง staff ในหน่วยงานที่ปิดไม่ได้ |
+
+flow รีเซ็ตรหัสผ่านสำเร็จ (กดลิงก์ในอีเมล) ทดสอบใน Postman ไม่ได้ เพราะ token ส่งทางอีเมลเท่านั้น ให้ทดสอบด้วยมือ
 
 ## ข้อควรรู้
 
-- **Rate limit:** gateway จำกัด login / register / guest / create user รวม 30 ครั้งต่อนาที หนึ่งรอบใช้ประมาณ 9 ครั้ง ถ้ารันติดกันหลายรอบแล้วได้ 429 ให้รอ 1 นาที
+- **Rate limit:** gateway จำกัด login / register / guest / password / logout / forgot / reset / create user รวม 30 ครั้งต่อนาที หนึ่งรอบใช้ประมาณ 24 ครั้ง **รันห่างกันอย่างน้อย 1 นาที** ไม่งั้นได้ 429
+- **ตั้ง `EMAIL_MODE=record` ก่อนรัน** ถ้าเป็น `gmail` คอลเลกชันจะส่งอีเมลจริงหลายสิบฉบับไปยังอีเมลทดสอบ (`@example.test`)
 - **Notifications ต้องมี MongoDB** ข้อ 09 จะรอ 3 วินาทีให้ event เดินทาง outbox → RabbitMQ → MongoDB ก่อนตรวจ
 - ข้อ 08 ปรับผลตามระบบ: ถ้าปิด auto-routing ระบบควรเก็บเรื่องไว้ให้ admin, ถ้าไม่มีกฎ IT ควรเป็น REVIEW
 - ไม่มี API ลบ user และ ticket จึงมีข้อมูลทดสอบสะสมในฐานข้อมูลทุกครั้งที่รัน

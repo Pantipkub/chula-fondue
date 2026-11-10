@@ -49,6 +49,9 @@ spec:
               value: amqp://guest:guest@rabbitmq:5672
             - name: MONGODB_URL
               value: mongodb://mongo:27017
+            # Must match Auth Service: recovery links from any other origin are refused.
+            - name: WEB_PUBLIC_URL
+              value: http://localhost:8090
           ports:
             - name: http
               containerPort: 8082
