@@ -10,3 +10,5 @@ services/api-gateway/uploads/
 playwright-report/
 test-results/
 *.tsbuildinfo
+coverage/
+.scannerwork/

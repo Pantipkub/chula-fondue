@@ -7,9 +7,9 @@ import { PageHead } from '../components/layouts';
 import { Button, ErrorBox, Icon, Input, Note, PasswordInput, useToast } from '../components/ui';
 import { AuthFrame } from './public';
 
-function PasswordFields({ password, confirm, setPassword, setConfirm }: {
+function PasswordFields({ password, confirm, setPassword, setConfirm }: Readonly<{
   password: string; confirm: string; setPassword: (value: string) => void; setConfirm: (value: string) => void;
-}) {
+}>) {
   return <>
     <PasswordInput id="new-password" label="รหัสผ่านใหม่" autoComplete="new-password" required minLength={8} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} help="8–128 ตัวอักษร" />
     <PasswordInput id="confirm-password" label="ยืนยันรหัสผ่านใหม่" autoComplete="new-password" required minLength={8} maxLength={128} value={confirm} onChange={e => setConfirm(e.target.value)} error={confirm && password !== confirm ? 'รหัสผ่านไม่ตรงกัน' : undefined} />
@@ -23,10 +23,10 @@ export function ForgotPassword() {
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const submit = async (e: FormEvent) => {
-    e.preventDefault(); if (submitting.current) return;
+    e.preventDefault(); if (submitting.current) { return; }
     submitting.current = true; setBusy(true); setError('');
     try { await Api.forgotPassword(email.trim()); setSent(true); }
-    catch (x) { setError((x as Error).message); }
+    catch (error_) { setError((error_ as Error).message); }
     finally { submitting.current = false; setBusy(false); }
   };
   return <AuthFrame title="รีเซ็ตรหัสผ่าน" sub="เราจะส่งลิงก์ไปที่อีเมลที่คุณลงทะเบียนไว้">
@@ -52,19 +52,19 @@ export function ResetPassword() {
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const submit = async (e: FormEvent) => {
-    e.preventDefault(); if (submitting.current || password !== confirm) return;
+    e.preventDefault(); if (submitting.current || password !== confirm) { return; }
     submitting.current = true; setBusy(true); setError('');
     try { await Api.resetPassword(token, password); clearSession(); setDone(true); }
-    catch (x) { setError((x as Error).message); }
+    catch (error_) { setError((error_ as Error).message); }
     finally { submitting.current = false; setBusy(false); }
   };
   return <AuthFrame title="ตั้งรหัสผ่านใหม่" sub="ลิงก์ตั้งรหัสผ่านใช้ได้เพียงครั้งเดียว">
     <form className="stack" style={{ width: 'min(440px, 100%)', gap: 20 }} onSubmit={submit}>
       <h1>ตั้งรหัสผ่านใหม่</h1>
-      {done ? <><Note tone="sage" icon="check">ตั้งรหัสผ่านแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่</Note><Link to="/login" className="btn primary block">เข้าสู่ระบบ</Link></> : !/^[a-f0-9]{64}$/.test(token) ? <ErrorBox error="ลิงก์ตั้งรหัสผ่านไม่ถูกต้อง กรุณาขอลิงก์ใหม่" /> : <>
+      {(done) && (<><Note tone="sage" icon="check">ตั้งรหัสผ่านแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่</Note><Link to="/login" className="btn primary block">เข้าสู่ระบบ</Link></>)}{!(done) && (/^[a-f0-9]{64}$/.test(token) ? <>
         <PasswordFields {...{ password, confirm, setPassword, setConfirm }} />
         <ErrorBox error={error} /><Button type="submit" block busy={busy} disabled={!confirm || password !== confirm}>บันทึกรหัสผ่าน</Button>
-      </>}
+      </> : <ErrorBox error="ลิงก์ตั้งรหัสผ่านไม่ถูกต้อง กรุณาขอลิงก์ใหม่" />)}
       {!done && <Link to="/forgot-password" className="center small">ขอลิงก์ตั้งรหัสผ่านใหม่</Link>}
     </form>
   </AuthFrame>;
@@ -81,7 +81,7 @@ export function Account() {
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const submit = async (e: FormEvent) => {
-    e.preventDefault(); if (submitting.current || password !== confirm) return;
+    e.preventDefault(); if (submitting.current || password !== confirm) { return; }
     submitting.current = true; setBusy(true); setError('');
     try {
       await Api.changePassword(current, password);
@@ -89,7 +89,7 @@ export function Account() {
       nav('/login', { replace: true });
       clearSession();
     }
-    catch (x) { setError((x as Error).message); }
+    catch (error_) { setError((error_ as Error).message); }
     finally { submitting.current = false; setBusy(false); }
   };
   return <div className="page" style={{ maxWidth: 720 }}>

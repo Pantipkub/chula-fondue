@@ -49,25 +49,25 @@ const STEPS = ['แจ้งซ่อม', 'รับเรื่อง', 'ก�
 const STEP_INDEX: Record<string, number> = { SUBMITTED: 0, ASSIGNED: 1, IN_PROGRESS: 2, RESOLVED: 3, CLOSED: 5 };
 
 export const shortId = (id: string) => '#' + id.slice(0, 8).toUpperCase();
-const escapeHtml = (value: unknown) => String(value ?? '')
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const escapeHtml = (value: string | number | null | undefined) => String(value ?? '')
+  .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 const clip = (value: string, max: number) => (value.length > max ? value.slice(0, max - 1).trimEnd() + '…' : value);
 const categoryLabel = (value = '') => CATEGORY[value.trim().toLowerCase()] ?? value;
 const httpsImage = (urls?: string[]) => urls?.find((url) => /^https:\/\//i.test(url));
 
 function formatTime(iso?: string) {
   const date = iso ? new Date(iso) : new Date();
-  if (Number.isNaN(date.getTime())) return '';
+  if (Number.isNaN(date.getTime())) { return ''; }
   return new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' }).format(date) + ' น.';
 }
 
 // Who this copy is for decides the wording. Ticket Service sends assignment, reopening and
 // cancellation to the department, rejection to both sides, and every other change to the reporter.
 function audienceOf(event: EmailEvent): Audience {
-  if (event.status === 'ASSIGNED' || event.status === 'CANCELLED') return 'department';
-  if (event.status === 'IN_PROGRESS' && event.fromStatus === 'RESOLVED') return 'department';
+  if (event.status === 'ASSIGNED' || event.status === 'CANCELLED') { return 'department'; }
+  if (event.status === 'IN_PROGRESS' && event.fromStatus === 'RESOLVED') { return 'department'; }
   if (event.status === 'REJECTED' && event.reporterEmail &&
-      event.recipientEmail.toLowerCase() !== event.reporterEmail.toLowerCase()) return 'department';
+      event.recipientEmail.toLowerCase() !== event.reporterEmail.toLowerCase()) { return 'department'; }
   return 'reporter';
 }
 
@@ -75,9 +75,9 @@ function copyFor(event: EmailEvent, audience: Audience) {
   const autoClosed = event.status === 'CLOSED' && /automatic/i.test(event.note ?? '');
   const reopened = event.status === 'IN_PROGRESS' && event.fromStatus === 'RESOLVED';
   if (audience === 'department') {
-    if (event.status === 'ASSIGNED') return { title: 'มีงานแจ้งซ่อมใหม่ถึงหน่วยงานของคุณ', lead: 'กรุณาตรวจสอบรายละเอียด และกด “เริ่มซ่อม” เมื่อช่างเข้าดำเนินการ' };
-    if (reopened) return { title: 'ผู้แจ้งส่งงานกลับให้แก้ไข', lead: 'ผู้แจ้งตรวจหน้างานแล้วยังพบปัญหา งานกลับมาอยู่ในสถานะกำลังซ่อม' };
-    if (event.status === 'CANCELLED') return { title: 'ผู้แจ้งยกเลิกการแจ้งซ่อม', lead: 'ไม่ต้องดำเนินการต่อสำหรับงานนี้' };
+    if (event.status === 'ASSIGNED') { return { title: 'มีงานแจ้งซ่อมใหม่ถึงหน่วยงานของคุณ', lead: 'กรุณาตรวจสอบรายละเอียด และกด “เริ่มซ่อม” เมื่อช่างเข้าดำเนินการ' }; }
+    if (reopened) { return { title: 'ผู้แจ้งส่งงานกลับให้แก้ไข', lead: 'ผู้แจ้งตรวจหน้างานแล้วยังพบปัญหา งานกลับมาอยู่ในสถานะกำลังซ่อม' }; }
+    if (event.status === 'CANCELLED') { return { title: 'ผู้แจ้งยกเลิกการแจ้งซ่อม', lead: 'ไม่ต้องดำเนินการต่อสำหรับงานนี้' }; }
     return { title: 'ผู้ดูแลระบบยกเลิกงานนี้', lead: 'งานนี้ไม่อยู่ในขอบเขตงานซ่อม ไม่ต้องดำเนินการต่อ' };
   }
   switch (event.status) {
@@ -95,20 +95,31 @@ const SAGE = '#8EA66B';
 const LINE_STRONG = '#E6CACA';
 const BRAND_DARK = '#7A3B45';
 const LOGO_CID = 'logo@chula-fondue';
-const WEB_URL = () => (process.env.WEB_PUBLIC_URL ?? 'http://localhost:8080').replace(/\/+$/, '');
+const WEB_URL = () => {
+  const value = process.env.WEB_PUBLIC_URL ?? 'http://localhost:8080';
+  let end = value.length;
+  while (value[end - 1] === '/') end--;
+  return value.slice(0, end);
+};
+
+function stepStyles(done: boolean, now: boolean) {
+  if (done) return { dot: `background:${SAGE};border:1px solid ${SAGE};color:#ffffff;`, text: `color:${INK};` };
+  if (now) return { dot: `background:${BRAND};border:1px solid ${BRAND};color:#ffffff;`, text: `font-weight:600;color:${BRAND_DARK};` };
+  return { dot: `background:#ffffff;border:1px solid ${LINE_STRONG};color:${MUTED};`, text: `color:${MUTED};` };
+}
 
 /** Same five steps as the web's HSteps: green ticks behind, a pink current dot, outlined steps ahead. */
 function stepsHtml(status: string) {
   const current = STEP_INDEX[status];
-  if (current === undefined) return '';
-  const bar = (on: boolean, hidden = false) => `<td style="width:50%;padding:0;"><div style="height:2px;background:${hidden ? 'transparent' : on ? SAGE : LINE_STRONG};font-size:0;line-height:0;">&nbsp;</div></td>`;
+  if (current === undefined) { return ''; }
+  const bar = (on: boolean, hidden = false) => {
+    const color = on ? SAGE : LINE_STRONG;
+    return `<td style="width:50%;padding:0;"><div style="height:2px;background:${hidden ? 'transparent' : color};font-size:0;line-height:0;">&nbsp;</div></td>`;
+  };
   const cells = STEPS.map((label, i) => {
     const done = i < current;
     const now = i === current;
-    const dot = done ? `background:${SAGE};border:1px solid ${SAGE};color:#ffffff;`
-      : now ? `background:${BRAND};border:1px solid ${BRAND};color:#ffffff;`
-        : `background:#ffffff;border:1px solid ${LINE_STRONG};color:${MUTED};`;
-    const text = now ? `font-weight:600;color:${BRAND_DARK};` : done ? `color:${INK};` : `color:${MUTED};`;
+    const { dot, text } = stepStyles(done, now);
     return `<td width="20%" valign="top" align="center" style="padding:0;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
         ${bar(i <= current, i === 0)}
@@ -153,6 +164,19 @@ function layout({ title, preheader, card, footnote }: { title: string; preheader
 
 export interface BuiltEmail { subject: string; text: string; html: string }
 
+function detailsRows(event: EmailEvent, when: string, description: string) {
+  const pairs = [
+    event.category ? kv('หมวด', escapeHtml(categoryLabel(event.category))) : '',
+    event.location ? kv('สถานที่', escapeHtml(event.location)) : '',
+    event.departmentName ? kv('หน่วยงาน', escapeHtml(event.departmentName)) : '',
+    when ? kv('อัปเดตเมื่อ', escapeHtml(when)) : '',
+  ].filter(Boolean);
+  const rows = [];
+  for (let i = 0; i < pairs.length; i += 2) rows.push(`<tr>${pairs[i]}${pairs[i + 1] ?? '<td></td>'}</tr>`);
+  if (description) rows.push(`<tr>${kv('รายละเอียด', escapeHtml(description).replaceAll('\n', '<br>'), 2)}</tr>`);
+  return rows.join('');
+}
+
 export function buildEmail(event: EmailEvent): BuiltEmail {
   const audience = audienceOf(event);
   const copy = copyFor(event, audience);
@@ -164,15 +188,7 @@ export function buildEmail(event: EmailEvent): BuiltEmail {
   const description = clip(event.description ?? '', 400);
   const link = `${WEB_URL()}${audience === 'department' ? '/staff/tickets/' : '/tickets/'}${encodeURIComponent(event.ticketId)}`;
 
-  const pairs = [
-    event.category ? kv('หมวด', escapeHtml(categoryLabel(event.category))) : '',
-    event.location ? kv('สถานที่', escapeHtml(event.location)) : '',
-    event.departmentName ? kv('หน่วยงาน', escapeHtml(event.departmentName)) : '',
-    when ? kv('อัปเดตเมื่อ', escapeHtml(when)) : '',
-  ].filter(Boolean);
-  const rows = [];
-  for (let i = 0; i < pairs.length; i += 2) rows.push(`<tr>${pairs[i]}${pairs[i + 1] ?? '<td></td>'}</tr>`);
-  if (description) rows.push(`<tr>${kv('รายละเอียด', escapeHtml(description).replace(/\n/g, '<br>'), 2)}</tr>`);
+  const rows = detailsRows(event, when, description);
 
   const card = `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
@@ -186,7 +202,7 @@ export function buildEmail(event: EmailEvent): BuiltEmail {
       <td style="background:${status.tone.bg};border-radius:12px;padding:12px 14px;font:400 14px/1.6 ${FONT};color:${INK};">
       <strong style="font-weight:600;color:${status.tone.fg};">เหตุผล:</strong> ${escapeHtml(clip(String(event.reason), 500))}</td></tr></table>` : ''}
     <div style="height:1px;background:${LINE};font-size:0;line-height:0;margin:0 0 20px;">&nbsp;</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows.join('')}</table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
     ${photo ? `<img src="${escapeHtml(photo)}" alt="รูปจุดชำรุด" width="542" style="display:block;width:100%;max-width:542px;height:auto;border-radius:12px;margin:4px 0 20px;">` : ''}
     ${button(link, 'ดูรายละเอียด')}`;
 
@@ -241,7 +257,7 @@ export function recoveryMessage(event: RecoveryEmail, from: string) {
 
 // multipart/related carries the logo as an inline cid: image; Gmail blocks data: URIs and may not load remote images.
 function mimeParts(event: { eventId: string; recipientEmail: string }, from: string, parts: { subject: string; text: string; html: string }) {
-  if ([from, event.recipientEmail].some((value) => /[\r\n]/.test(value))) throw new Error('Invalid email header');
+  if ([from, event.recipientEmail].some((value) => /[\r\n]/.test(value))) { throw new Error('Invalid email header'); }
   const { subject, text, html } = parts;
   const id = event.eventId.replace(/[^\w-]/g, '');
   const related = `fondue-rel-${id}`;

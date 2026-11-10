@@ -34,24 +34,27 @@ export const fmtDate = (iso: string) => (iso ? dtf.format(new Date(iso)) : '—'
 export const fmtShort = (iso: string) => (iso ? df.format(new Date(iso)) : '—');
 export function ago(iso: string) {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (s < 60) return 'เมื่อครู่';
-  if (s < 3600) return `${Math.floor(s / 60)} นาทีที่แล้ว`;
-  if (s < 86400) return `${Math.floor(s / 3600)} ชั่วโมงที่แล้ว`;
-  if (s < 86400 * 7) return `${Math.floor(s / 86400)} วันที่แล้ว`;
+  if (s < 60) { return 'เมื่อครู่'; }
+  if (s < 3600) { return `${Math.floor(s / 60)} นาทีที่แล้ว`; }
+  if (s < 86400) { return `${Math.floor(s / 3600)} ชั่วโมงที่แล้ว`; }
+  if (s < 86400 * 7) { return `${Math.floor(s / 86400)} วันที่แล้ว`; }
   return fmtShort(iso);
 }
 
 /** Turns one history row into a Thai title, an optional detail line, and an icon. */
 export function describe(h: HistoryEntry) {
   const n = h.note ?? '';
-  if (n.startsWith('Category changed to ')) return { title: 'เปลี่ยนหมวดงาน', detail: categoryOf(n.slice('Category changed to '.length)).label, icon: 'route', tone: 'pink' };
+  if (n.startsWith('Category changed to ')) { return { title: 'เปลี่ยนหมวดงาน', detail: categoryOf(n.slice('Category changed to '.length)).label, icon: 'route', tone: 'pink' }; }
   switch (h.toStatus) {
-    case 'SUBMITTED': return n.startsWith('Automatic routing needs review: ')
-      ? { title: 'รอผู้ดูแลส่งต่อ', detail: routingReason(n.slice('Automatic routing needs review: '.length)), icon: 'info', tone: 'honey' }
-      : n === 'Automatic routing requested by admin'
-        ? { title: 'ส่งต่ออัตโนมัติอีกครั้ง', detail: '', icon: 'route', tone: 'pink' }
-        : { title: 'แจ้งซ่อม', detail: '', icon: 'send', tone: 'honey' };
-    case 'ASSIGNED': return { title: n.startsWith('Automatically assigned to ') ? 'ส่งต่ออัตโนมัติ' : h.fromStatus === 'ASSIGNED' ? 'เปลี่ยนหน่วยงาน' : 'ส่งต่อหน่วยงาน', detail: n.replace(/^Automatically assigned to (.*?) \(category:.*$/, 'ให้ $1').replace(/^Assigned to /, 'ให้ '), icon: 'route', tone: 'pink' };
+    case 'SUBMITTED': {
+      if (n.startsWith('Automatic routing needs review: ')) return { title: 'รอผู้ดูแลส่งต่อ', detail: routingReason(n.slice('Automatic routing needs review: '.length)), icon: 'info', tone: 'honey' };
+      if (n === 'Automatic routing requested by admin') return { title: 'ส่งต่ออัตโนมัติอีกครั้ง', detail: '', icon: 'route', tone: 'pink' };
+      return { title: 'แจ้งซ่อม', detail: '', icon: 'send', tone: 'honey' };
+    }
+    case 'ASSIGNED': {
+      const manualTitle = h.fromStatus === 'ASSIGNED' ? 'เปลี่ยนหน่วยงาน' : 'ส่งต่อหน่วยงาน';
+      return { title: n.startsWith('Automatically assigned to ') ? 'ส่งต่ออัตโนมัติ' : manualTitle, detail: n.replace(/^Automatically assigned to (.*?) \(category:.*$/, 'ให้ $1').replace(/^Assigned to /, 'ให้ '), icon: 'route', tone: 'pink' };
+    }
     case 'IN_PROGRESS': return h.fromStatus === 'RESOLVED'
       ? { title: 'ผู้แจ้งส่งกลับแก้ไข', detail: n, icon: 'undo', tone: 'lilac', quote: true }
       : { title: 'เริ่มซ่อม', detail: '', icon: 'wrench', tone: 'lilac' };

@@ -29,10 +29,10 @@ export function ReportForm() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (guest) return setNeedLogin(true); // Enter key path
-    if (!photos.length) return setErr('กรุณาแนบรูปอย่างน้อย 1 รูป');
-    if (!location) return setErr('กรุณาระบุสถานที่');
-    if (submitting.current) return;
+    if (guest) { return setNeedLogin(true); } // Enter key path
+    if (!photos.length) { return setErr('กรุณาแนบรูปอย่างน้อย 1 รูป'); }
+    if (!location) { return setErr('กรุณาระบุสถานที่'); }
+    if (submitting.current) { return; }
     submitting.current = true;
     setBusy(true); setErr('');
     try {
@@ -42,7 +42,7 @@ export function ReportForm() {
       const t = await Api.createTicket(f, submissionKey);
       recentTickets.add(t.id);
       nav(`/report/done/${t.id}`, { state: { ticket: t } });
-    } catch (x) { setErr((x as Error).message); setBusy(false); } finally { submitting.current = false; }
+    } catch (error_) { setErr((error_ as Error).message); setBusy(false); } finally { submitting.current = false; }
   };
   const c = categoryOf(category);
   return (
@@ -75,7 +75,7 @@ export function ReportForm() {
         <div className="stack report-summary" style={{ ['--gap' as string]: '20px' }}>
           <div className="card stack" style={{ ['--gap' as string]: '14px' }}>
             <h3>สรุปการแจ้งซ่อม</h3>
-            {[[c.icon, 'หมวด', c.label], ['pin', 'สถานที่', location || '—'], ['image', 'รูปถ่าย', `${photos.length} รูป`], ['user', 'ผู้แจ้ง', guest ? 'ยังไม่ได้เข้าสู่ระบบ' : session!.email]].map(([i, a, b]) => <KV key={a} icon={i} k={a} v={b} />)}
+            {[[c.icon, 'หมวด', c.label], ['pin', 'สถานที่', location || '—'], ['image', 'รูปถ่าย', `${photos.length} รูป`], ['user', 'ผู้แจ้ง', guest ? 'ยังไม่ได้เข้าสู่ระบบ' : session.email]].map(([i, a, b]) => <KeyValue key={a} icon={i} k={a} v={b} />)}
             <hr className="divider" />
             <ErrorBox error={err} />
             {/* onClick runs before the browser's required-field check, so guests see the login prompt even on an empty form. */}
@@ -143,10 +143,10 @@ export function MyTickets() {
   const [busyId, setBusyId] = useState('');
   const all = load.data ?? [];
   const n = (s: Status[]) => all.filter((t) => s.includes(t.status)).length;
-  const list = useMemo(() => all.filter((t) => (!TABS[tab][1] || TABS[tab][1]!.includes(t.status)) && (!q || `${t.id} ${t.location} ${t.description}`.toLowerCase().includes(q.toLowerCase()))), [all, tab, q]);
+  const list = useMemo(() => all.filter((t) => (!TABS[tab][1] || TABS[tab][1].includes(t.status)) && (!q || `${t.id} ${t.location} ${t.description}`.toLowerCase().includes(q.toLowerCase()))), [all, tab, q]);
   const confirm = async (t: Ticket) => {
     setBusyId(t.id);
-    try { await Api.confirm(t.id); toast('ตรวจรับงานแล้ว'); load.reload(); } catch (x) { toast((x as Error).message, 'red'); } finally { setBusyId(''); }
+    try { await Api.confirm(t.id); toast('ตรวจรับงานแล้ว'); load.reload(); } catch (error_) { toast((error_ as Error).message, 'red'); } finally { setBusyId(''); }
   };
   return (
     <div className="page">
@@ -162,18 +162,17 @@ export function MyTickets() {
         <div style={{ width: 280 }}><Input id="q" icon="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาเลขที่ หรือสถานที่" aria-label="ค้นหา" /></div>
       </div>
       <ErrorBox error={load.error} />
-      {load.loading && !load.data ? <div className="cards3"><Skeleton h={320} /><Skeleton h={320} /><Skeleton h={320} /></div>
-        : list.length === 0 ? <div className="card"><Empty icon="ticket" title={all.length ? 'ไม่มีรายการในสถานะนี้' : 'ยังไม่มีรายการแจ้งซ่อม'}>{!all.length && <Button icon="plus" onClick={() => nav('/report')}>แจ้งซ่อม</Button>}</Empty></div>
+      {(load.loading && !load.data) && (<div className="cards3"><Skeleton h={320} /><Skeleton h={320} /><Skeleton h={320} /></div>)}{!(load.loading && !load.data) && (list.length === 0 ? <div className="card"><Empty icon="ticket" title={all.length ? 'ไม่มีรายการในสถานะนี้' : 'ยังไม่มีรายการแจ้งซ่อม'}>{!all.length && <Button icon="plus" onClick={() => nav('/report')}>แจ้งซ่อม</Button>}</Empty></div>
         : <div className="cards3">{list.map((t, i) => (
           <TicketCard key={t.id} t={t} i={i} to={`/tickets/${t.id}`}>
             {t.status === 'RESOLVED' && (
-              <div className="note tone-honey" style={{ flexDirection: 'column' }} onClick={(e) => e.preventDefault()}>
+              <div className="note tone-honey" style={{ flexDirection: 'column' }}>
                 <span className="row strong small" style={{ ['--gap' as string]: '8px' }}><Icon name="info" size={16} />ซ่อมเสร็จแล้ว กรุณาตรวจรับงาน</span>
                 <div className="two" style={{ gap: 8, width: '100%' }}><Button kind="success" sm icon="check" busy={busyId === t.id} onClick={() => confirm(t)}>ตรวจรับ</Button><Button kind="outline" sm onClick={() => nav(`/tickets/${t.id}?reopen=1`)}>ส่งกลับแก้ไข</Button></div>
               </div>
             )}
           </TicketCard>
-        ))}</div>}
+        ))}</div>)}
     </div>
   );
 }
@@ -187,10 +186,11 @@ export const Kpi = ({ icon, n, label, hl, selected, onClick }: { icon: string; n
     ? <button type="button" className={`card kpi kpi-btn${hl ? ' hl' : ''}${selected ? ' selected' : ''}`} aria-pressed={!!selected} onClick={onClick}>{body}</button>
     : <div className={`card kpi${hl ? ' hl' : ''}`}>{body}</div>;
 };
-export function TicketCard({ t, i, to, children }: { t: Ticket; i: number; to: string; children?: React.ReactNode }) {
+export function TicketCard({ t, i, to, children }: Readonly<{ t: Ticket; i: number; to: string; children?: React.ReactNode }>) {
   const c = categoryOf(t.category);
   return (
-    <Link to={to} className="card tcard">
+    <article className="card tcard">
+      <Link to={to} className="tcard-main">
       <Photo src={t.photoUrls[0]} tone={i} />
       <div className="body">
         <div className="row between"><Badge status={t.status} /><span className="xs muted tid">{shortId(t.id)}</span></div>
@@ -198,8 +198,9 @@ export function TicketCard({ t, i, to, children }: { t: Ticket; i: number; to: s
         <Meta icon="pin">{t.location}</Meta>
         <div className="row between"><Meta icon={c.icon}>{c.label}</Meta><Meta icon="clock">{ago(t.updatedAt)}</Meta></div>
       </div>
+      </Link>
       {children}
-    </Link>
+    </article>
   );
 }
 
@@ -213,13 +214,13 @@ export function TicketDetail() {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const close = () => { setModal(null); setErr(''); if (sp.get('reopen')) setSp({}, { replace: true }); };
+  const close = () => { setModal(null); setErr(''); if (sp.get('reopen')) { setSp({}, { replace: true }); } };
   const act = async (fn: () => Promise<unknown>, msg: string) => {
     setBusy(true); setErr('');
-    try { await fn(); toast(msg); close(); load.reload(); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
+    try { await fn(); toast(msg); close(); load.reload(); } catch (error_) { setErr((error_ as Error).message); } finally { setBusy(false); }
   };
-  if (load.loading && !load.data) return <div className="page"><Skeleton h={60} /><Skeleton h={420} /></div>;
-  if (load.error || !load.data) return <div className="page"><ErrorBox error={load.error ?? 'ไม่พบรายการนี้'} /><Link to="/my">กลับไปรายการแจ้งซ่อม</Link></div>;
+  if (load.loading && !load.data) { return <div className="page"><Skeleton h={60} /><Skeleton h={420} /></div>; }
+  if (load.error || !load.data) { return <div className="page"><ErrorBox error={load.error ?? 'ไม่พบรายการนี้'} /><Link to="/my">กลับไปรายการแจ้งซ่อม</Link></div>; }
   const { ticket: t, history } = load.data;
   const c = categoryOf(t.category);
   return (
@@ -238,7 +239,7 @@ export function TicketDetail() {
           <Gallery urls={t.photoUrls} />
           <div className="card lg stack">
             <h3>รายละเอียด</h3><p style={{ lineHeight: 1.7 }}>{t.description}</p><hr className="divider" />
-            <div className="two"><KV icon={c.icon} k="หมวด" v={c.label} /><KV icon="pin" k="สถานที่" v={t.location} /><KV icon="calendar" k="แจ้งเมื่อ" v={fmtDate(t.createdAt)} /><KV icon="building" k="หน่วยงาน" v={t.departmentName || 'รอส่งต่อหน่วยงาน'} /></div>
+            <div className="two"><KeyValue icon={c.icon} k="หมวด" v={c.label} /><KeyValue icon="pin" k="สถานที่" v={t.location} /><KeyValue icon="calendar" k="แจ้งเมื่อ" v={fmtDate(t.createdAt)} /><KeyValue icon="building" k="หน่วยงาน" v={t.departmentName || 'รอส่งต่อหน่วยงาน'} /></div>
           </div>
           {t.completionPhotoUrls.length > 0 && (
             <div className="card lg stack" style={{ background: 'var(--sage-100)', borderColor: 'var(--sage-300)' }}>
@@ -275,4 +276,4 @@ export function TicketDetail() {
     </div>
   );
 }
-export const KV = ({ icon, k, v }: { icon: string; k: string; v: string }) => <div className="kv"><Icon name={icon} /><div className="grow"><div className="xs muted">{k}</div><div className="small strong" style={{ wordBreak: 'break-word' }}>{v}</div></div></div>;
+export const KeyValue = ({ icon, k, v }: { icon: string; k: string; v: string }) => <div className="kv"><Icon name={icon} /><div className="grow"><div className="xs muted">{k}</div><div className="small strong" style={{ wordBreak: 'break-word' }}>{v}</div></div></div>;

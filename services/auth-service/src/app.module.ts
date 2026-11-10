@@ -7,11 +7,14 @@ import { User } from './user.entity.js';
 import { AuthMail, PasswordReset } from './password-reset.entity.js';
 import { AuthMailService } from './auth-mail.service.js';
 
+const databaseUrl = process.env.AUTH_DATABASE_URL;
+if (!databaseUrl?.trim()) throw new Error('AUTH_DATABASE_URL is required');
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      url: process.env.AUTH_DATABASE_URL ?? 'postgresql://fondue:fondue@localhost:5433/auth',
+      url: databaseUrl,
       entities: [User, AuthMail, PasswordReset],
       synchronize: true,
       // Keep retrying while PostgreSQL starts; Docker restarts the container if it never comes up.

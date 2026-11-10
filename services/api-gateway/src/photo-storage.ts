@@ -52,7 +52,8 @@ async function uploadToCloudinary(data: Buffer, extension: string) {
   form.append('file', new Blob([new Uint8Array(data)]), `photo.${extension}`);
   form.append('api_key', apiKey);
   form.append('timestamp', timestamp);
-  form.append('signature', createHash('sha1').update(`timestamp=${timestamp}${apiSecret}`).digest('hex'));
+  // Cloudinary accepts SHA-256 signatures for the same signed parameters.
+  form.append('signature', createHash('sha256').update(`timestamp=${timestamp}${apiSecret}`).digest('hex'));
   let response: Response;
   try {
     response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: form, signal: AbortSignal.timeout(15000) });

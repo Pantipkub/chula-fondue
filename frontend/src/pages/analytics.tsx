@@ -5,25 +5,29 @@ import { Empty, ErrorBox, IconButton, Input, Select, Skeleton, useLoad } from '.
 import { PageHead } from '../components/layouts';
 import { Kpi } from './reporter';
 
+function hours(value: number | null) {
+  if (value === null) return '—';
+  return value >= 24 ? `${(value / 24).toFixed(1)} วัน` : `${value.toFixed(1)} ชั่วโมง`;
+}
+
 export function Analytics() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [departmentId, setDepartment] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
   const [category, setCategory] = useState('');
   const departments = useLoad(Api.departments);
   const load = useLoad(() => Api.analytics({ from, to, departmentId, category }), [from, to, departmentId, category]);
   const s = load.data;
-  const hours = (value: number | null) => value === null ? '—' : value >= 24 ? `${(value / 24).toFixed(1)} วัน` : `${value.toFixed(1)} ชั่วโมง`;
   return <>
     <PageHead title="รายงาน" sub="เวลาซ่อมเฉลี่ยนับจากวันที่แจ้งถึงวันที่ซ่อมเสร็จ"><IconButton icon="refresh" label="รีเฟรช" onClick={load.reload} busy={load.loading} /></PageHead>
     <div className="card analytics-filters">
       <Input id="from" type="date" label="ตั้งแต่วันที่" value={from} onChange={e => setFrom(e.target.value)} />
       <Input id="to" type="date" label="ถึงวันที่" value={to} onChange={e => setTo(e.target.value)} />
-      <Select id="analytics-dept" label="หน่วยงาน" value={departmentId} onChange={e => setDepartment(e.target.value)}><option value="">ทุกหน่วยงาน</option>{departments.data?.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</Select>
+      <Select id="analytics-dept" label="หน่วยงาน" value={departmentId} onChange={e => setDepartmentId(e.target.value)}><option value="">ทุกหน่วยงาน</option>{departments.data?.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</Select>
       <Select id="analytics-category" label="หมวดหมู่" value={category} onChange={e => setCategory(e.target.value)}><option value="">ทุกหมวดหมู่</option>{CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</Select>
     </div>
     <ErrorBox error={load.error || departments.error} />
-    {!s ? load.loading ? <Skeleton h={300} /> : null : <>
+    {(s) && (<>
       <div className="kpis">
         <Kpi icon="ticket" n={s.total} label="งานทั้งหมด" />
         <Kpi icon="clock" n={hours(s.mttrHours)} label="เวลาซ่อมเฉลี่ย" />
@@ -39,6 +43,6 @@ export function Analytics() {
         <div className="card lg stack"><h3>จำนวนแจ้งซ่อมรายวัน</h3><div className="bars">{s.daily.slice(-30).map(d => <div key={d.date} title={`${d.date}: ${d.count} งาน`}><i style={{ height: `${Math.max(4, d.count / Math.max(...s.daily.map(r => r.count)) * 150)}px` }} /><span className="tid">{d.date.slice(5)}</span></div>)}</div></div>
       </>}
       <p className="xs muted">ข้อมูล ณ {new Date(s.generatedAt).toLocaleString('th-TH')}</p>
-    </>}
+    </>)}{!(s) && (load.loading ? <Skeleton h={300} /> : null)}
   </>;
 }
