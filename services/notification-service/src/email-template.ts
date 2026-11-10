@@ -2,6 +2,8 @@
 // Pure functions only (no Nest imports), so the template can be unit-tested and previewed on its own.
 // HTML email rules: tables + inline styles, no external CSS/JS/fonts, max width 600px, every user value escaped.
 
+import { LOGO_PNG_BASE64 } from './logo.js';
+
 export interface EmailEvent {
   eventId: string;
   ticketId: string;
@@ -44,7 +46,7 @@ const CATEGORY: Record<string, string> = {
   electrical: 'ไฟฟ้า', plumbing: 'ประปา', 'air conditioning': 'เครื่องปรับอากาศ', 'it / network': 'ไอที / เครือข่าย', building: 'อาคารสถานที่', other: 'อื่น ๆ',
 };
 const STEPS = ['แจ้งซ่อม', 'รับเรื่อง', 'กำลังซ่อม', 'ตรวจรับงาน', 'ปิดงาน'];
-const STEP_INDEX: Record<string, number> = { SUBMITTED: 0, ASSIGNED: 1, IN_PROGRESS: 2, RESOLVED: 3, CLOSED: 4 };
+const STEP_INDEX: Record<string, number> = { SUBMITTED: 0, ASSIGNED: 1, IN_PROGRESS: 2, RESOLVED: 3, CLOSED: 5 };
 
 export const shortId = (id: string) => '#' + id.slice(0, 8).toUpperCase();
 const escapeHtml = (value: unknown) => String(value ?? '')
@@ -87,23 +89,66 @@ function copyFor(event: EmailEvent, audience: Audience) {
   }
 }
 
-function progressHtml(status: string) {
+
+// Colours mirror the web tokens in frontend/src/styles.css so the email reads as the same product.
+const SAGE = '#8EA66B';
+const LINE_STRONG = '#E6CACA';
+const BRAND_DARK = '#7A3B45';
+const LOGO_CID = 'logo@chula-fondue';
+const WEB_URL = () => (process.env.WEB_PUBLIC_URL ?? 'http://localhost:8080').replace(/\/+$/, '');
+
+/** Same five steps as the web's HSteps: green ticks behind, a pink current dot, outlined steps ahead. */
+function stepsHtml(status: string) {
   const current = STEP_INDEX[status];
   if (current === undefined) return '';
-  const cells = STEPS.map((label, index) => {
-    const done = index <= current;
-    const dot = done ? BRAND : '#E6CACA';
-    const text = index === current ? INK : done ? MUTED : '#B3A1A3';
-    return `<td align="center" valign="top" style="width:20%;padding:0 2px;">
-      <div style="height:6px;border-radius:3px;background:${dot};font-size:0;line-height:0;">&nbsp;</div>
-      <div style="padding-top:6px;font:${index === current ? 600 : 400} 12px/1.4 ${FONT};color:${text};">${label}</div></td>`;
+  const bar = (on: boolean, hidden = false) => `<td style="width:50%;padding:0;"><div style="height:2px;background:${hidden ? 'transparent' : on ? SAGE : LINE_STRONG};font-size:0;line-height:0;">&nbsp;</div></td>`;
+  const cells = STEPS.map((label, i) => {
+    const done = i < current;
+    const now = i === current;
+    const dot = done ? `background:${SAGE};border:1px solid ${SAGE};color:#ffffff;`
+      : now ? `background:${BRAND};border:1px solid ${BRAND};color:#ffffff;`
+        : `background:#ffffff;border:1px solid ${LINE_STRONG};color:${MUTED};`;
+    const text = now ? `font-weight:600;color:${BRAND_DARK};` : done ? `color:${INK};` : `color:${MUTED};`;
+    return `<td width="20%" valign="top" align="center" style="padding:0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        ${bar(i <= current, i === 0)}
+        <td width="28" style="padding:0;"><div style="width:26px;height:26px;border-radius:14px;${dot}text-align:center;font:600 13px/26px ${FONT};">${done ? '&#10003;' : i + 1}</div></td>
+        ${bar(i < current, i === STEPS.length - 1)}
+      </tr></table>
+      <div style="padding:8px 2px 0;font:400 12px/1.4 ${FONT};${text}">${label}</div></td>`;
   }).join('');
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 24px;"><tr>${cells}</tr></table>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr>${cells}</tr></table>`;
 }
 
-function row(label: string, value: string) {
-  return `<tr><td valign="top" style="padding:8px 12px 8px 0;width:96px;font:400 13px/1.5 ${FONT};color:${MUTED};white-space:nowrap;">${label}</td>
-    <td valign="top" style="padding:8px 0;font:500 14px/1.5 ${FONT};color:${INK};">${value}</td></tr>`;
+/** One label/value pair, styled like the web's KV block: small muted label above a medium-weight value. */
+const kv = (label: string, value: string, colspan = 1) =>
+  `<td valign="top" colspan="${colspan}" style="padding:0 12px 16px 0;width:${colspan === 2 ? '100%' : '50%'};">
+    <div style="font:400 12px/1.5 ${FONT};color:${MUTED};">${label}</div>
+    <div style="padding-top:2px;font:500 14px/1.55 ${FONT};color:${INK};">${value}</div></td>`;
+
+const button = (href: string, label: string) =>
+  `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 0;"><tr><td style="border-radius:10px;background:${BRAND};">
+    <a href="${escapeHtml(href)}" style="display:inline-block;padding:0 22px;font:500 15px/44px ${FONT};color:#ffffff;text-decoration:none;border-radius:10px;">${label}</a>
+  </td></tr></table>`;
+
+/** Page frame shared by every email: logo header, white card, footer. */
+function layout({ title, preheader, card, footnote }: { title: string; preheader: string; card: string; footnote: string }) {
+  return `<!DOCTYPE html>
+<html lang="th"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>${escapeHtml(title)}</title></head>
+<body style="margin:0;padding:0;background:${CANVAS};">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CANVAS};"><tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">
+  <tr><td style="padding:0 4px 20px;">
+    <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+      <td style="padding:0;"><img src="cid:${LOGO_CID}" width="40" height="40" alt="Chula Fondue" style="display:block;width:40px;height:40px;border:0;border-radius:10px;"></td>
+      <td style="padding-left:10px;font:600 20px/1.2 ${FONT};color:${BRAND_DARK};">Chula Fondue</td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="background:#ffffff;border:1px solid ${LINE};border-radius:16px;padding:28px;">${card}</td></tr>
+  <tr><td style="padding:18px 8px 0;text-align:center;font:400 12px/1.7 ${FONT};color:${MUTED};">${footnote}</td></tr>
+</table></td></tr></table></body></html>`;
 }
 
 export interface BuiltEmail { subject: string; text: string; html: string }
@@ -117,45 +162,38 @@ export function buildEmail(event: EmailEvent): BuiltEmail {
   const reasonShown = (event.status === 'REJECTED' || (event.status === 'IN_PROGRESS' && event.fromStatus === 'RESOLVED')) && event.reason;
   const photo = event.status === 'RESOLVED' ? httpsImage(event.completionPhotoUrls) : httpsImage(event.photoUrls);
   const description = clip(event.description ?? '', 400);
+  const link = `${WEB_URL()}${audience === 'department' ? '/staff/tickets/' : '/tickets/'}${encodeURIComponent(event.ticketId)}`;
 
-  const details = [
-    row('เลขที่แจ้งซ่อม', `<span style="font-family:Consolas,Menlo,monospace;letter-spacing:.5px;">${escapeHtml(id)}</span>`),
-    event.category ? row('หมวด', escapeHtml(categoryLabel(event.category))) : '',
-    event.location ? row('สถานที่', escapeHtml(event.location)) : '',
-    event.departmentName ? row('หน่วยงาน', escapeHtml(event.departmentName)) : '',
-    description ? row('รายละเอียด', escapeHtml(description).replace(/\n/g, '<br>')) : '',
-    when ? row('อัปเดตเมื่อ', escapeHtml(when)) : '',
-  ].join('');
+  const pairs = [
+    event.category ? kv('หมวด', escapeHtml(categoryLabel(event.category))) : '',
+    event.location ? kv('สถานที่', escapeHtml(event.location)) : '',
+    event.departmentName ? kv('หน่วยงาน', escapeHtml(event.departmentName)) : '',
+    when ? kv('อัปเดตเมื่อ', escapeHtml(when)) : '',
+  ].filter(Boolean);
+  const rows = [];
+  for (let i = 0; i < pairs.length; i += 2) rows.push(`<tr>${pairs[i]}${pairs[i + 1] ?? '<td></td>'}</tr>`);
+  if (description) rows.push(`<tr>${kv('รายละเอียด', escapeHtml(description).replace(/\n/g, '<br>'), 2)}</tr>`);
 
-  const html = `<!DOCTYPE html>
-<html lang="th"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>${escapeHtml(copy.title)}</title></head>
-<body style="margin:0;padding:0;background:${CANVAS};">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(`${id} · ${copy.lead}`)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CANVAS};"><tr><td align="center" style="padding:28px 12px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">
-  <tr><td style="padding:0 4px 18px;">
-    <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-      <td style="width:36px;height:36px;border-radius:10px;background:${BRAND};text-align:center;font:700 18px/36px ${FONT};color:#fff;">F</td>
-      <td style="padding-left:10px;font:700 17px/1.2 ${FONT};color:${INK};">Chula Fondue</td>
+  const card = `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="padding:0;"><span style="display:inline-block;padding:3px 12px;border-radius:999px;background:${status.tone.bg};color:${status.tone.fg};font:500 12px/1.7 ${FONT};">&#9679;&nbsp;${escapeHtml(status.label)}</span></td>
+      <td align="right" style="padding:0;font:500 13px/1.5 Consolas,Menlo,monospace;letter-spacing:.5px;color:${MUTED};">${escapeHtml(id)}</td>
     </tr></table>
-  </td></tr>
-  <tr><td style="background:#ffffff;border:1px solid ${LINE};border-radius:20px;padding:28px 28px 24px;">
-    <span style="display:inline-block;padding:4px 12px;border-radius:999px;background:${status.tone.bg};color:${status.tone.fg};font:600 12px/1.6 ${FONT};">● ${escapeHtml(status.label)}</span>
-    <h1 style="margin:14px 0 8px;font:700 22px/1.35 ${FONT};color:${INK};">${escapeHtml(copy.title)}</h1>
-    <p style="margin:0 0 22px;font:400 15px/1.65 ${FONT};color:${MUTED};">${escapeHtml(copy.lead)}</p>
-    ${progressHtml(event.status)}
-    ${reasonShown ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;"><tr>
-      <td style="border-left:4px solid ${status.tone.fg};background:${status.tone.bg};border-radius:8px;padding:12px 14px;font:400 14px/1.6 ${FONT};color:${INK};">
-      <strong style="color:${status.tone.fg};">เหตุผล:</strong> ${escapeHtml(clip(String(event.reason), 500))}</td></tr></table>` : ''}
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${LINE};">${details}</table>
-    ${photo ? `<img src="${escapeHtml(photo)}" alt="รูปประกอบ" width="544" style="display:block;width:100%;max-width:544px;height:auto;border-radius:12px;margin:24px 0 0;">` : ''}
-  </td></tr>
-  <tr><td style="padding:18px 8px 0;text-align:center;font:400 12px/1.7 ${FONT};color:${MUTED};">
-    อีเมลนี้ส่งอัตโนมัติจาก Chula Fondue กรุณาอย่าตอบกลับ<br>
-    <span style="color:#B3A1A3;">อ้างอิง ${escapeHtml(event.eventId.slice(0, 8))}</span>
-  </td></tr>
-</table></td></tr></table></body></html>`;
+    <h1 style="margin:16px 0 6px;font:600 22px/1.4 ${FONT};color:${INK};">${escapeHtml(copy.title)}</h1>
+    <p style="margin:0 0 24px;font:400 15px/1.7 ${FONT};color:${MUTED};">${escapeHtml(copy.lead)}</p>
+    ${stepsHtml(event.status)}
+    ${reasonShown ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr>
+      <td style="background:${status.tone.bg};border-radius:12px;padding:12px 14px;font:400 14px/1.6 ${FONT};color:${INK};">
+      <strong style="font-weight:600;color:${status.tone.fg};">เหตุผล:</strong> ${escapeHtml(clip(String(event.reason), 500))}</td></tr></table>` : ''}
+    <div style="height:1px;background:${LINE};font-size:0;line-height:0;margin:0 0 20px;">&nbsp;</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows.join('')}</table>
+    ${photo ? `<img src="${escapeHtml(photo)}" alt="รูปจุดชำรุด" width="542" style="display:block;width:100%;max-width:542px;height:auto;border-radius:12px;margin:4px 0 20px;">` : ''}
+    ${button(link, 'ดูรายละเอียด')}`;
+
+  const html = layout({
+    title: copy.title, preheader: `${id} · ${copy.lead}`, card,
+    footnote: `อีเมลนี้ส่งอัตโนมัติจาก Chula Fondue กรุณาอย่าตอบกลับ<br><span style="color:#B3A1A3;">อ้างอิง ${escapeHtml(event.eventId.slice(0, 8))}</span>`,
+  });
 
   const text = [
     copy.title, '', copy.lead, '',
@@ -167,6 +205,7 @@ export function buildEmail(event: EmailEvent): BuiltEmail {
     reasonShown ? `เหตุผล: ${event.reason}` : null,
     description ? `\nรายละเอียด:\n${description}` : null,
     when ? `\nอัปเดตเมื่อ: ${when}` : null,
+    `\nดูรายละเอียด: ${link}`,
     '', '— Chula Fondue (อีเมลอัตโนมัติ กรุณาอย่าตอบกลับ)',
   ].filter((line) => line !== null).join('\n');
 
@@ -174,10 +213,11 @@ export function buildEmail(event: EmailEvent): BuiltEmail {
 }
 
 // RFC 2045 asks for base64 lines of at most 76 characters.
-const base64Lines = (value: string) => (Buffer.from(value, 'utf8').toString('base64').match(/.{1,76}/g) ?? []).join('\r\n');
+const wrap76 = (base64: string) => (base64.match(/.{1,76}/g) ?? []).join('\r\n');
+const base64Lines = (value: string) => wrap76(Buffer.from(value, 'utf8').toString('base64'));
 const encodedWord = (value: string) => `=?UTF-8?B?${Buffer.from(value, 'utf8').toString('base64')}?=`;
 
-/** The whole message (headers + multipart/alternative body) as Gmail's `raw` field: base64url. */
+/** The whole message (headers + multipart body with the inline logo) as Gmail's `raw` field: base64url. */
 export function mimeMessage(event: EmailEvent, from: string) {
   return mimeParts(event, from, buildEmail(event));
 }
@@ -188,19 +228,34 @@ export interface RecoveryEmail {
 export function recoveryMessage(event: RecoveryEmail, from: string) {
   const subject = 'ตั้งรหัสผ่านใหม่ — Chula Fondue';
   const text = `มีคำขอตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ\n\n${event.resetUrl}\n\nลิงก์ใช้ได้ครั้งเดียวและหมดอายุภายใน 30 นาที หากคุณไม่ได้ร้องขอ ให้ข้ามอีเมลนี้`;
-  const html = `<div style="font-family:${FONT};max-width:600px;margin:auto;padding:24px;color:${INK}"><h1>ตั้งรหัสผ่านใหม่</h1><p>มีคำขอตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ</p><p><a href="${escapeHtml(event.resetUrl)}">ตั้งรหัสผ่านใหม่</a></p><p>ลิงก์ใช้ได้ครั้งเดียวและหมดอายุภายใน 30 นาที หากคุณไม่ได้ร้องขอ ให้ข้ามอีเมลนี้</p></div>`;
+  const card = `
+    <h1 style="margin:0 0 6px;font:600 22px/1.4 ${FONT};color:${INK};">ตั้งรหัสผ่านใหม่</h1>
+    <p style="margin:0 0 20px;font:400 15px/1.7 ${FONT};color:${MUTED};">มีคำขอตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ กดปุ่มด้านล่างเพื่อตั้งรหัสผ่าน</p>
+    ${button(event.resetUrl, 'ตั้งรหัสผ่านใหม่')}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 0;"><tr>
+      <td style="background:#FFF9D6;border-radius:12px;padding:12px 14px;font:400 13px/1.6 ${FONT};color:#8A6A12;">ลิงก์ใช้ได้ครั้งเดียวและหมดอายุภายใน 30 นาที หากคุณไม่ได้ร้องขอ ให้ข้ามอีเมลนี้</td>
+    </tr></table>`;
+  const html = layout({ title: 'ตั้งรหัสผ่านใหม่', preheader: 'ลิงก์ตั้งรหัสผ่านใหม่ ใช้ได้ภายใน 30 นาที', card, footnote: 'อีเมลนี้ส่งอัตโนมัติจาก Chula Fondue กรุณาอย่าตอบกลับ' });
   return mimeParts(event, from, { subject, text, html });
 }
+
+// multipart/related carries the logo as an inline cid: image; Gmail blocks data: URIs and may not load remote images.
 function mimeParts(event: { eventId: string; recipientEmail: string }, from: string, parts: { subject: string; text: string; html: string }) {
   if ([from, event.recipientEmail].some((value) => /[\r\n]/.test(value))) throw new Error('Invalid email header');
   const { subject, text, html } = parts;
-  const boundary = `fondue-${event.eventId.replace(/[^\w-]/g, '')}`;
+  const id = event.eventId.replace(/[^\w-]/g, '');
+  const related = `fondue-rel-${id}`;
+  const alternative = `fondue-${id}`;
   return Buffer.from([
     `From: Chula Fondue <${from}>`, `To: ${event.recipientEmail}`, `Subject: ${encodedWord(subject)}`,
     `Message-ID: <${event.eventId}@chula-fondue.local>`, 'MIME-Version: 1.0',
-    `Content-Type: multipart/alternative; boundary="${boundary}"`, '',
-    `--${boundary}`, 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', base64Lines(text),
-    `--${boundary}`, 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', base64Lines(html),
-    `--${boundary}--`, '',
+    `Content-Type: multipart/related; boundary="${related}"; type="multipart/alternative"`, '',
+    `--${related}`, `Content-Type: multipart/alternative; boundary="${alternative}"`, '',
+    `--${alternative}`, 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', base64Lines(text),
+    `--${alternative}`, 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', base64Lines(html),
+    `--${alternative}--`, '',
+    `--${related}`, 'Content-Type: image/png; name="chula-fondue.png"', 'Content-Transfer-Encoding: base64',
+    `Content-ID: <${LOGO_CID}>`, 'Content-Disposition: inline; filename="chula-fondue.png"', '', wrap76(LOGO_PNG_BASE64),
+    `--${related}--`, '',
   ].join('\r\n')).toString('base64url');
 }

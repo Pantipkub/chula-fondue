@@ -57,6 +57,9 @@ test('HTML email escapes user text, and offers a plain-text part', () => {
   const department = decode(rawMessage({ ...base, status: 'ASSIGNED', recipientEmail: 'facilities@example.com' }, 'sender@example.com'));
   assert.ok(!department.includes('<img src=x'), 'description must be escaped');
   assert.match(department, /มีงานแจ้งซ่อมใหม่ถึงหน่วยงานของคุณ/);
+  assert.match(raw, /Content-ID: <logo@chula-fondue>/, 'logo travels as an inline attachment');
+  assert.match(department, /src="cid:logo@chula-fondue"/);
+  assert.match(department, /\/staff\/tickets\/abcd1234-/, 'department button opens the staff work page');
   const guest = decode(rawMessage({ ...base, status: 'REJECTED', reason: 'duplicate', recipientEmail: 'reporter@example.com' }, 'sender@example.com'));
   assert.match(guest, /duplicate/);
 });

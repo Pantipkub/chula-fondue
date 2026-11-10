@@ -254,7 +254,7 @@ export const Empty = ({ icon = 'inbox', title, children }: { icon?: string; titl
 );
 export const Skeleton = ({ h = 120 }: { h?: number }) => <div className="skeleton" style={{ height: h }} />;
 export const Meta = ({ icon, children }: { icon: string; children: ReactNode }) => <span className="meta"><Icon name={icon} size={15} />{children}</span>;
-export const Logo = ({ to = '/' }: { to?: string }) => <Link className="logo" to={to}><span className="mark"><Icon name="wrench" size={20} /></span><span><b>Chula Fondue</b></span></Link>;
+export const Logo = ({ to = '/' }: { to?: string }) => <Link className="logo" to={to}><img className="mark" src="/logo.png" alt="" width={40} height={40} /><b>Chula Fondue</b></Link>;
 
 /** Loads data once (and again when `deps` change); returns [data, error, reload]. */
 export function useLoad<T>(fn: () => Promise<T>, deps: unknown[] = [], poll?: (data: T) => boolean) {
