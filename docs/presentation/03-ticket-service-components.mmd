@@ -12,11 +12,11 @@ flowchart LR
     repos["TypeORM repositories<br/><small>Ticket · History · RoutingJob · Outbox</small>"]
 
     controller -->|Invokes workflow| service
-    service -->|Status transition workflow| routing
-    service -->|Persists and queries entities| repos
-    routing -->|Claims routing jobs| repos
-    background -->|Reads pending outbox · retries| repos
-    service -->|Writes event in same transaction| repos
+    service -->|Reads / writes ticket, history, routing job and outbox| repos
+    routing -->|Claims due job and ticket with lease| repos
+    routing -->|Commits match or review result| service
+    background -->|Polls outbox · retries publish| repos
+    background -->|Closes expired resolutions| service
   end
 
   dept["Department Service<br/><small>REST lookup · routing-rule match</small>"]
@@ -47,4 +47,3 @@ flowchart LR
   style ticket_service fill:#F7FAFC,stroke:#7EA4C2,stroke-width:2px
   style workers fill:#FFFFFF,stroke:#B7CAD8,stroke-width:1px
   style legend fill:#FFFFFF,stroke:#B9C9D5,stroke-dasharray:4 3
-  linkStyle 9 stroke:#D87645,stroke-width:3px

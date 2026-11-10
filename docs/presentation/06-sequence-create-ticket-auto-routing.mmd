@@ -3,14 +3,14 @@ sequenceDiagram
   autonumber
   actor Reporter
   participant GW as API Gateway
-  participant Photos as Photo Storage
+  participant Photos as Photo Storage<br/>Cloudinary or local volume
   participant TS as Ticket Service
   participant PG as PostgreSQL
   participant Auto as Auto Routing Worker
   participant Dept as Department Service
 
-  Reporter->>GW: POST /tickets with report fields and optional Idempotency-Key
-  Note over GW: Require signed-in reporter and validate required fields
+  Reporter->>GW: POST /api/tickets with report fields · photos · Idempotency-Key
+  Note over GW: Require signed-in Reporter · validate category · location · description
   alt Matching submission already exists
     GW->>TS: gRPC FindSubmission with reporter id and content fingerprint
     TS->>PG: Look up reporter id and submission key
@@ -25,12 +25,12 @@ sequenceDiagram
       TS-->>GW: Continue with new ticket
     end
     Note over GW,TS: Reusing a key with different content returns 409
-    opt Photos attached
-      GW->>Photos: Store photos in Cloudinary or local uploads volume
-      Photos-->>GW: Photo URLs
-    end
+    GW->>GW: Validate 1–5 JPEG, PNG or WebP photos (max 5 MB each)
+    GW->>Photos: Store required photos in Cloudinary or local uploads volume
+    Photos-->>GW: Photo URLs
     GW->>TS: gRPC CreateTicket with reporter identity key and fingerprint
     TS->>PG: Begin transaction and write SUBMITTED ticket history and outbox
+    Note over TS,PG: Serialize the same reporter and key to prevent concurrent duplicate tickets
     opt Automatic routing enabled
       TS->>PG: Also create PENDING routing job
     end
@@ -44,7 +44,7 @@ sequenceDiagram
     Auto->>PG: Claim routing job and load ticket
     PG-->>Auto: Ticket category and lease token
     Auto->>Dept: POST /routing-rules/match with category and 3 s timeout
-    alt Exactly one enabled rule matches
+    alt Exactly one enabled rule matches an active department
       Dept-->>Auto: MATCHED with department and rule id
       Auto->>PG: Atomic update ASSIGNED plus history outbox and job DONE
       PG-->>Auto: Commit successful
@@ -53,5 +53,5 @@ sequenceDiagram
       Auto->>PG: Keep ticket SUBMITTED and mark routing job REVIEW
       PG-->>Auto: Review state saved
     end
-    Note over Auto,Dept: Transient errors retry with backoff. Stale results are ignored
+    Note over Auto,Dept: Transient failures retry with backoff. After five attempts the job needs review. Stale results are ignored
   end
