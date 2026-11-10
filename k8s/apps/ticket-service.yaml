@@ -28,9 +28,9 @@ metadata:
   labels:
     app: ticket-service
 spec:
+  # No `replicas`: the HorizontalPodAutoscaler in ../autoscaling.yaml keeps 2-5 pods by CPU.
   # Several replicas are safe: outbox and routing workers claim rows with SKIP LOCKED and leases,
   # and every ticket change is protected by a row lock plus a version check.
-  replicas: 2
   selector:
     matchLabels:
       app: ticket-service
@@ -85,7 +85,7 @@ spec:
             periodSeconds: 10
             failureThreshold: 6
           resources:
-            requests: { cpu: 50m, memory: 128Mi }
+            requests: { cpu: 100m, memory: 128Mi } # the HPA's 70% target is measured against this
             limits: { memory: 384Mi }
           securityContext:
             allowPrivilegeEscalation: false

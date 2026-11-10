@@ -20,7 +20,7 @@ metadata:
   labels:
     app: auth-service
 spec:
-  replicas: 1
+  # No `replicas`: the HorizontalPodAutoscaler in ../autoscaling.yaml keeps 1-4 pods by CPU.
   selector:
     matchLabels:
       app: auth-service
@@ -62,7 +62,7 @@ spec:
             periodSeconds: 10
             failureThreshold: 6
           resources:
-            requests: { cpu: 50m, memory: 96Mi }
+            requests: { cpu: 100m, memory: 96Mi } # the HPA's 70% target is measured against this
             limits: { memory: 384Mi }
           securityContext:
             allowPrivilegeEscalation: false

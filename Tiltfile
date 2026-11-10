@@ -90,6 +90,24 @@ docker_build(
     ignore=['services/*/src', '**/node_modules', '**/dist'],
 )
 
+# ---------------------------------------------------------------- metrics-server (for autoscaling)
+# The HorizontalPodAutoscalers in k8s/autoscaling.yaml read CPU from metrics-server, which Docker Desktop
+# does not ship. Installed once into kube-system; --kubelet-insecure-tls is needed because Docker Desktop's
+# kubelet uses a self-signed certificate. `tilt down` leaves it installed (it is a cluster add-on).
+METRICS_SERVER = 'https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.7.2/components.yaml'
+local_resource(
+    'metrics-server',
+    cmd='''set -e
+K="kubectl --context %s -n kube-system"
+if ! $K get deployment metrics-server >/dev/null 2>&1; then
+  kubectl --context %s apply -f %s
+  $K patch deployment metrics-server --type=json \
+    -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+fi
+$K rollout status deployment/metrics-server --timeout=180s''' % (k8s_context(), k8s_context(), METRICS_SERVER),
+    labels=['infra'],
+)
+
 # ---------------------------------------------------------------- resources in the Tilt UI
 k8s_resource(new_name='config', objects=['chula-fondue:namespace', 'fondue-secrets:secret'], labels=['infra'])
 k8s_resource('postgres', objects=['postgres-init:configmap'], resource_deps=['config'], labels=['infra'],
@@ -98,10 +116,14 @@ k8s_resource('rabbitmq', resource_deps=['config'], labels=['infra'],
              port_forwards=['15675:15672'], links=[link('http://localhost:15675', 'RabbitMQ UI (guest / guest)')])
 k8s_resource('mongo', resource_deps=['config'], labels=['infra'])
 
-k8s_resource('auth-service', resource_deps=['postgres'], labels=['backend'])
+# Services with a HorizontalPodAutoscaler show it in the same Tilt resource.
+k8s_resource('auth-service', objects=['auth-service:horizontalpodautoscaler'],
+             resource_deps=['postgres'], labels=['backend'])
 k8s_resource('department-service', resource_deps=['postgres'], labels=['backend'])
-k8s_resource('ticket-service', resource_deps=['postgres', 'rabbitmq'], labels=['backend'])
-k8s_resource('notification-service', resource_deps=['rabbitmq', 'mongo'], labels=['backend'])
+k8s_resource('ticket-service', objects=['ticket-service:horizontalpodautoscaler'],
+             resource_deps=['postgres', 'rabbitmq'], labels=['backend'])
+k8s_resource('notification-service', objects=['notification-service:horizontalpodautoscaler'],
+             resource_deps=['rabbitmq', 'mongo'], labels=['backend'])
 k8s_resource('analytics-service', resource_deps=['postgres', 'rabbitmq'], labels=['backend'])
 k8s_resource('api-gateway', objects=['api-gateway-uploads:persistentvolumeclaim'],
              resource_deps=['auth-service', 'department-service', 'ticket-service'], labels=['backend'],
@@ -115,5 +137,17 @@ local_resource(
     cmd='for i in 1 2 3 4 5 6; do node --env-file=%s scripts/seed-demo.mjs && exit 0; sleep 5; done; exit 1' % ENV_FILE,
     env={'API_URL': 'http://localhost:3200'},
     resource_deps=['api-gateway', 'notification-service', 'analytics-service'],
+    labels=['tools'],
+)
+
+# Manual: 50 clients read one ticket's history for 2 minutes, enough CPU for ticket-service to scale out.
+# Needs at least one ticket (report one on the website first). Watch: kubectl -n chula-fondue get hpa -w
+local_resource(
+    'load-test',
+    cmd='mkdir -p test-results && node --env-file=%s tests/performance.mjs' % ENV_FILE,
+    env={'API_URL': 'http://localhost:3200', 'PERF_SECONDS': '120'},
+    resource_deps=['seed-demo', 'metrics-server'],
+    trigger_mode=TRIGGER_MODE_MANUAL,
+    auto_init=False,
     labels=['tools'],
 )

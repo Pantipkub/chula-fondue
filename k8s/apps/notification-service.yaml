@@ -20,9 +20,9 @@ metadata:
   labels:
     app: notification-service
 spec:
+  # No `replicas`: the HorizontalPodAutoscaler in ../autoscaling.yaml keeps 2-4 pods by CPU.
   # Competing consumers: RabbitMQ hands each message of the "notifications" queue to one replica.
   # Duplicates are ignored by eventId, and the Gmail worker claims each email with a lease.
-  replicas: 2
   selector:
     matchLabels:
       app: notification-service
