@@ -1,0 +1,69 @@
+@startuml
+!include <C4/C4_Container>
+
+title Container diagram for Chula Fondue (C4 Level 2, Docker Compose deployment)
+
+AddRelTag("async", $lineStyle = DashedLine(), $textColor = "#B4561E", $lineColor = "#D87645", $legendText = "asynchronous event (RabbitMQ)")
+
+Person(reporter, "Reporter", "Student, staff or visitor")
+Person(central_admin, "Central Admin", "Routes and manages tickets")
+Person(department_staff, "Department Staff", "Resolves assigned tickets")
+
+System_Boundary(chula_fondue, "Chula Fondue: one Docker Compose project, private network 'backend'") {
+  Container(web_frontend, "Web Frontend", "React 18, nginx", "Thai-language single-page app for every role. nginx serves the app and proxies /api and /uploads to the gateway. Published on port 8080.")
+  Container(api_gateway, "API Gateway", "NestJS, Node.js 22", "The only published API (port 3000). Verifies JWT, checks role and ownership, validates and stores photos, translates REST to gRPC, adds X-Request-Id.")
+
+  Container(auth_service, "Auth Service", "NestJS", "Accounts, login, JWT issue and session check, roles, password reset.")
+  Container(department_service, "Department Service", "NestJS", "Departments and category-to-department routing rules.")
+  Container(ticket_service, "Ticket Service", "NestJS, gRPC server", "Ticket workflow and status history, auto-routing worker, transactional outbox relay, auto-close after 7 days.")
+  Container(notification_service, "Notification Service", "NestJS", "Consumes status events, keeps each user's notification inbox, sends email through Gmail.")
+  Container(analytics_service, "Analytics Service", "NestJS", "Consumes status events into a reporting model: MTTR, counts by category, department and day.")
+
+  ContainerDb(auth_db, "Auth DB", "PostgreSQL 18", "Logical DB 'auth': users, password-reset requests")
+  ContainerDb(department_db, "Department DB", "PostgreSQL 18", "Logical DB 'department': departments, routing rules")
+  ContainerDb(ticket_db, "Ticket DB", "PostgreSQL 18", "Logical DB 'ticket': tickets, history, outbox, routing jobs")
+  ContainerDb(analytics_db, "Analytics DB", "PostgreSQL 18", "Logical DB 'analytics': event projection")
+  ContainerDb(notification_db, "Notification DB", "MongoDB 8", "Notification inbox, email delivery state")
+  ContainerQueue(message_broker, "Message Broker", "RabbitMQ 4", "Durable queues 'notifications' and 'analytics'")
+  ContainerDb(photo_volume, "Photo Storage", "Docker named volume 'uploads'", "Issue and completion photos, served at /uploads")
+}
+
+System_Ext(gmail, "Gmail API", "Google email delivery")
+
+' Users -> frontend -> gateway
+Rel(reporter, web_frontend, "Uses", "HTTP :8080")
+Rel(central_admin, web_frontend, "Uses", "HTTP :8080")
+Rel(department_staff, web_frontend, "Uses", "HTTP :8080")
+Rel(web_frontend, api_gateway, "Proxies /api/*", "JSON/HTTP, api-gateway:3000")
+
+' Gateway -> services (synchronous)
+Rel(api_gateway, auth_service, "Login, session check per request", "JSON/HTTP, auth-service:3002")
+Rel(api_gateway, department_service, "Department and rule management", "JSON/HTTP, department-service:3001")
+Rel(api_gateway, ticket_service, "Ticket commands and queries", "gRPC, ticket-service:50051, 5 s deadline")
+Rel(api_gateway, notification_service, "Reads inbox", "JSON/HTTP, notification-service:8082")
+Rel(api_gateway, analytics_service, "Reads reports", "JSON/HTTP, analytics-service:3003")
+Rel(api_gateway, photo_volume, "Writes photo files", "File I/O")
+
+' Service -> service (synchronous)
+Rel(ticket_service, department_service, "Validates department, matches routing rule", "JSON/HTTP, department-service:3001, 3 s timeout")
+Rel(auth_service, department_service, "Checks staff department", "JSON/HTTP, department-service:3001")
+Rel(auth_service, notification_service, "Requests password-reset email", "JSON/HTTP, notification-service:8082")
+
+' Database per service (one PostgreSQL container 'postgres' hosts four logical databases)
+Rel(auth_service, auth_db, "Reads/writes", "SQL, postgres:5432/auth")
+Rel(department_service, department_db, "Reads/writes", "SQL, postgres:5432/department")
+Rel(ticket_service, ticket_db, "Ticket + history + outbox in one transaction", "SQL, postgres:5432/ticket")
+Rel(analytics_service, analytics_db, "Writes projection, reads reports", "SQL, postgres:5432/analytics")
+Rel(notification_service, notification_db, "Upserts by eventId, reads inbox", "MongoDB, mongo:27017")
+
+' Events (asynchronous)
+Rel(ticket_service, message_broker, "Publishes ticket.status_changed (outbox relay every 2 s)", "AMQP, rabbitmq:5672", $tags = "async")
+Rel(message_broker, notification_service, "Delivers events, at least once", "AMQP, manual ack", $tags = "async")
+Rel(message_broker, analytics_service, "Delivers events, at least once", "AMQP, manual ack", $tags = "async")
+
+Rel(notification_service, gmail, "Sends emails", "HTTPS, OAuth 2.0")
+
+caption Service discovery: every container finds the others by Compose service name (e.g. ticket-service), resolved by Docker's embedded DNS on the 'backend' network.\nOnly the web frontend (8080) and the API Gateway (3000) are published for users. The other services have no host port; PostgreSQL, RabbitMQ and MongoDB are bound to 127.0.0.1 for local debugging only.
+
+SHOW_LEGEND()
+@enduml

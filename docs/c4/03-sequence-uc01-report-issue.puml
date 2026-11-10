@@ -1,0 +1,70 @@
+@startuml
+title UC-01 Report Campus Issue
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam maxMessageSize 300
+skinparam responseMessageBelowArrow true
+skinparam sequence {
+  ParticipantBackgroundColor #DCEEFF
+  ParticipantBorderColor #4B8CCB
+  ActorBackgroundColor #DCEEFF
+  ActorBorderColor #164B78
+  LifeLineBorderColor #8EABBF
+  GroupBackgroundColor #EEF4F8
+}
+skinparam database {
+  BackgroundColor #DCEEFF
+  BorderColor #4B8CCB
+}
+skinparam note {
+  BackgroundColor #FFF8E8
+  BorderColor #D9B867
+}
+
+actor "Reporter" as reporter
+participant "Web Frontend" as web
+participant "API Gateway" as gateway
+participant "Auth Service" as auth
+database "Photo Storage\n(uploads volume)" as photo_volume
+participant "Ticket Service" as ticket
+database "Ticket DB\n(PostgreSQL)" as ticket_db
+
+autonumber
+
+reporter -> web : Select "Report Issue", enter category, location,\ndescription and attach 1-5 photos
+web -> gateway : POST /api/tickets (multipart, Bearer JWT)
+activate gateway
+gateway -> auth : POST /auth/session (verify token)
+auth --> gateway : claims (role REPORTER)
+gateway -> gateway : Validate required fields and photos\n(1-5 files, max 5 MB each, JPEG/PNG/WebP)
+break invalid token (401), not a signed-in Reporter (403), missing field or invalid photo (400)
+  gateway --> web : error response
+  web --> reporter : Show error, ticket not created
+end
+gateway -> photo_volume : Save photos
+photo_volume --> gateway : photo URLs (/uploads/...)
+gateway -> ticket : gRPC CreateTicket(category, location, description, photoUrls)
+activate ticket
+ticket -> ticket_db : One transaction: INSERT ticket (status SUBMITTED)\n+ status history + outbox event
+ticket_db --> ticket : committed
+ticket --> gateway : ticket {id, status SUBMITTED}
+deactivate ticket
+gateway --> web : 201 Created
+deactivate gateway
+web --> reporter : Show Ticket ID and status "Submitted"
+note over gateway, ticket_db : The ticket is now listed in the Central Admin inbox (UC-02).\nWith AUTO_ROUTING_ENABLED=true the same transaction also queues a routing job,\nand a matching category rule can assign the ticket before an admin does.
+
+== Alternate flow: Reporter cancels a "Submitted" ticket ==
+reporter -> web : Cancel ticket
+web -> gateway : DELETE /api/tickets/{id}
+activate gateway
+gateway -> ticket : gRPC CancelTicket(id), after checking the ticket is the caller's
+activate ticket
+ticket -> ticket_db : One transaction: status CANCELLED + history + outbox event
+ticket --> gateway : ticket CANCELLED
+deactivate ticket
+gateway --> web : 200 OK
+deactivate gateway
+web --> reporter : Ticket removed from the normal list
+@enduml

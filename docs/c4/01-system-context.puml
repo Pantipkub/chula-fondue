@@ -1,0 +1,26 @@
+@startuml
+!include <C4/C4_Context>
+
+title System Context diagram for Chula Fondue (C4 Level 1)
+
+' Users
+Person(reporter, "Reporter", "Student, university staff or visitor. Reports a campus issue with photos, tracks it, cancels it, confirms the fix or asks to reopen.")
+Person(central_admin, "Central Admin", "Reviews new tickets, routes them to the responsible department, rejects invalid ones and manages departments, routing rules and accounts.")
+Person(department_staff, "Department Staff", "Works on tickets assigned to their department and submits completion photos as proof of repair.")
+
+' Our system
+System(chula_fondue, "Chula Fondue", "Campus issue reporting and repair tracking. Stores tickets with photos and status history, routes them to departments and notifies the people involved.")
+
+' External system
+System_Ext(gmail, "Gmail API", "Google email service. Delivers ticket-status and password-reset emails.")
+
+' Relationships
+Rel(reporter, chula_fondue, "Reports issues with 1-5 photos, tracks, cancels, confirms or reopens", "HTTP, web browser")
+Rel(central_admin, chula_fondue, "Reviews, routes, re-routes or rejects tickets; manages departments and accounts", "HTTP, web browser")
+Rel(department_staff, chula_fondue, "Starts work, uploads completion photos, resolves tickets", "HTTP, web browser")
+Rel(chula_fondue, gmail, "Sends notification and password-reset emails", "HTTPS, OAuth 2.0")
+Rel_U(gmail, reporter, "Delivers email to", "Email")
+Rel_U(gmail, department_staff, "Delivers email to", "Email")
+
+SHOW_LEGEND()
+@enduml
