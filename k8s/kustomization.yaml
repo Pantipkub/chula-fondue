@@ -1,0 +1,26 @@
+# Chula Fondue on Kubernetes (local development on Docker Desktop Kubernetes).
+#   With Tilt (recommended):  tilt up                 -> see ../Tiltfile and README.md
+#   Without Tilt:             docker compose build && kubectl apply -k k8s   (create the secret first, README.md)
+#
+# Same services, ports and names as docker-compose.yml, so every address in the code works unchanged:
+# Kubernetes Service DNS replaces Docker's embedded DNS (ADR-009).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: chula-fondue
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: chula-fondue
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - infra/postgres.yaml
+  - infra/rabbitmq.yaml
+  - infra/mongo.yaml
+  - apps/auth-service.yaml
+  - apps/department-service.yaml
+  - apps/ticket-service.yaml
+  - apps/notification-service.yaml
+  - apps/analytics-service.yaml
+  - apps/api-gateway.yaml
+  - apps/frontend.yaml
+  - autoscaling.yaml

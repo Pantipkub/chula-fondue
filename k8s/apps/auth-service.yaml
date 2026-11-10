@@ -1,0 +1,68 @@
+# Accounts and JWTs; REST on 3002, called only by the gateway.
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  labels:
+    app: auth-service
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - name: http
+      port: 3002
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  labels:
+    app: auth-service
+spec:
+  # No `replicas`: the HorizontalPodAutoscaler in ../autoscaling.yaml keeps 1-4 pods by CPU.
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000 # the image's `node` user
+      containers:
+        - name: auth-service
+          image: chula-fondue-auth-service
+          imagePullPolicy: IfNotPresent
+          # Secrets (JWT_SECRET, ADMIN_*) come from fondue-secrets; addresses below win over it, as in Compose.
+          envFrom:
+            - secretRef:
+                name: fondue-secrets
+                optional: true
+          env:
+            - name: AUTH_PORT
+              value: "3002"
+            - name: AUTH_DATABASE_URL
+              value: postgresql://fondue:fondue@postgres:5432/auth
+          ports:
+            - name: http
+              containerPort: 3002
+          # TypeORM retries the database for up to a minute before the port opens.
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 100m, memory: 96Mi } # the HPA's 70% target is measured against this
+            limits: { memory: 384Mi }
+          securityContext:
+            allowPrivilegeEscalation: false

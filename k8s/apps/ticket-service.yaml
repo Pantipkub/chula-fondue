@@ -1,0 +1,91 @@
+# Ticket workflow, outbox and auto-routing workers; gRPC on 50051, health on 8081.
+#
+# Headless Service (clusterIP: None): DNS returns the IP of every READY pod instead of one virtual IP.
+# gRPC keeps one long-lived HTTP/2 connection, so a normal ClusterIP would send all calls to one pod.
+# The gateway resolves dns:///ticket-service:50051 and balances calls with round_robin across these IPs.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-service
+  labels:
+    app: ticket-service
+spec:
+  clusterIP: None
+  selector:
+    app: ticket-service
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+    - name: health
+      port: 8081
+      targetPort: health
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-service
+  labels:
+    app: ticket-service
+spec:
+  # No `replicas`: the HorizontalPodAutoscaler in ../autoscaling.yaml keeps 2-5 pods by CPU.
+  # Several replicas are safe: outbox and routing workers claim rows with SKIP LOCKED and leases,
+  # and every ticket change is protected by a row lock plus a version check.
+  selector:
+    matchLabels:
+      app: ticket-service
+  template:
+    metadata:
+      labels:
+        app: ticket-service
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: ticket-service
+          image: chula-fondue-ticket-service
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: fondue-secrets
+                optional: true
+          env:
+            - name: TICKET_GRPC_URL
+              value: 0.0.0.0:50051
+            - name: HEALTH_PORT
+              value: "8081"
+            - name: TICKET_DATABASE_URL
+              value: postgresql://fondue:fondue@postgres:5432/ticket
+            - name: DEPARTMENT_SERVICE_URL
+              value: http://department-service:3001
+            - name: DEPARTMENT_TIMEOUT_MS
+              value: "3000"
+            - name: RABBITMQ_URL
+              value: amqp://guest:guest@rabbitmq:5672
+            # Closes each gRPC connection after 30 s (gracefully), so the gateway looks the name up again
+            # and starts using pods that were added by scaling up.
+            - name: GRPC_MAX_CONNECTION_AGE_MS
+              value: "30000"
+          ports:
+            - name: grpc
+              containerPort: 50051
+            - name: health
+              containerPort: 8081
+          startupProbe:
+            httpGet: { path: /health, port: health }
+            periodSeconds: 5
+            failureThreshold: 30
+          # "degraded" (RabbitMQ down) still answers 200: events wait in the outbox, tickets keep working.
+          readinessProbe:
+            httpGet: { path: /health/ready, port: health }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: health }
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 100m, memory: 128Mi } # the HPA's 70% target is measured against this
+            limits: { memory: 384Mi }
+          securityContext:
+            allowPrivilegeEscalation: false

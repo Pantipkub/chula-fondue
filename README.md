@@ -113,6 +113,10 @@ Admin เข้า `/admin/departments` เพื่อกำหนดหน่�
 
 ทดสอบหน้าจอส่งต่อด้วย `node --env-file-if-exists=.env.demo tests/routing-ui.mjs`; กำหนด `BROWSER_CHANNEL=chrome` สำหรับ Chrome ที่ติดตั้งอยู่ หรือ `chromium` สำหรับ Playwright Chromium ดู [รายละเอียดแผนและพฤติกรรม](docs/auto-routing-plan.md) และ [ผลตรวจสอบ](docs/auto-routing-verification.md)
 
+## Kubernetes (Tilt)
+
+รันระบบเดียวกันบน Kubernetes ของ Docker Desktop: เปิด Kubernetes ใน Docker Desktop, `brew install tilt-dev/tap/tilt` แล้ว `tilt up` (เว็บที่ http://localhost:8090, gateway ที่ http://localhost:3200) Compose ยังใช้ได้ตามเดิม ดูรายละเอียด replica, load balancing และวิธีรันแบบไม่ใช้ Tilt ที่ [k8s/README.md](k8s/README.md)
+
 ## ตั้งค่าเพิ่มเติม
 
 ดู `.env.example` และ [รายละเอียด implementation](docs/complete-platform.md), [API](docs/api.md), [สคริปต์สาธิต](docs/submission-demo-th.md). ค่าเริ่มต้น `EMAIL_MODE=record` บันทึกการแจ้งเตือนโดยไม่ส่งอีเมล. Gmail ต้องมี OAuth credentials ของผู้ส่งจึงส่งจริงได้.

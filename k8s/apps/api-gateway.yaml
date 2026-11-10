@@ -1,0 +1,117 @@
+# The only entry to the backend (REST -> REST/gRPC). Reached through the frontend's nginx at /api.
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  labels:
+    app: api-gateway
+spec:
+  selector:
+    app: api-gateway
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+# Local photo storage (CLOUDINARY_URL unset). ReadWriteOnce, so the gateway runs as ONE replica:
+# more replicas need shared storage (Cloudinary or object storage) and a shared rate-limit store.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: api-gateway-uploads
+  annotations:
+    tilt.dev/down-policy: keep # `tilt down` keeps uploaded photos
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  labels:
+    app: api-gateway
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # the ReadWriteOnce volume cannot be mounted by an old and a new pod at once
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      initContainers:
+        # A new volume belongs to root; the gateway runs as the node user (uid 1000).
+        - name: uploads-permissions
+          image: busybox:1.37
+          command: ["sh", "-c", "chown -R 1000:1000 /uploads"]
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+          volumeMounts:
+            - name: uploads
+              mountPath: /uploads
+      containers:
+        - name: api-gateway
+          image: chula-fondue-api-gateway
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: fondue-secrets
+                optional: true
+          env:
+            - name: GATEWAY_PORT
+              value: "3000"
+            # Empty: photo links are relative (/uploads/...) and served through the frontend's nginx.
+            - name: GATEWAY_PUBLIC_URL
+              value: ""
+            - name: AUTH_SERVICE_URL
+              value: http://auth-service:3002
+            - name: DEPARTMENT_SERVICE_URL
+              value: http://department-service:3001
+            - name: ANALYTICS_SERVICE_URL
+              value: http://analytics-service:3003
+            - name: NOTIFICATION_SERVICE_URL
+              value: http://notification-service:8082
+            - name: TICKET_SERVICE_URL
+              value: dns:///ticket-service:50051
+            - name: REST_TIMEOUT_MS
+              value: "5000"
+            - name: GRPC_TIMEOUT_MS
+              value: "5000"
+          ports:
+            - name: http
+              containerPort: 3000
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+            failureThreshold: 30
+          # Liveness only, as in Compose: an outage behind the gateway must not take the gateway out.
+          # Its own /health/ready (all dependencies) is for people and scripts, not for this probe.
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/services/api-gateway/uploads
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: api-gateway-uploads

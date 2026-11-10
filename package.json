@@ -23,14 +23,7 @@
     "test:routing": "node --env-file-if-exists=.env.demo tests/routing-e2e.mjs",
     "test:routing:recovery": "node --env-file-if-exists=.env.demo tests/routing-recovery.mjs",
     "test:ui:live": "node tests/ui-live.mjs",
-    "test:load": "node scripts/run-load-tests.mjs average",
-    "test:stress": "node scripts/run-load-tests.mjs stress",
-    "test:perf": "node scripts/run-load-tests.mjs all",
-    "test:perf:unit": "node --test tests/load-test.test.mjs",
-    "test:platform": "node --env-file-if-exists=.env.demo --test tests/platform.integration.test.mjs",
-    "test:platform:e2e": "node --env-file-if-exists=.env.demo tests/platform-e2e.mjs",
-    "test:platform:ui": "node --env-file-if-exists=.env.demo tests/platform-ui.mjs",
-    "test:ui:auth-tabs": "node tests/ui-auth-tabs.mjs"
+    "test:postman": "npx --yes newman run postman/chula-fondue.postman_collection.json -e postman/environments/demo.postman_environment.json --working-dir ."
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

@@ -29,6 +29,9 @@ import { TicketsController } from './tickets.controller.js';
             'grpc.dns_min_time_between_resolutions_ms': 1000,
             'grpc.initial_reconnect_backoff_ms': 500,
             'grpc.max_reconnect_backoff_ms': 3000,
+            // Use every address the name resolves to. Compose returns one IP (no change); a Kubernetes
+            // headless Service returns one IP per ready ticket-service pod, so calls are spread across them.
+            'grpc.service_config': JSON.stringify({ loadBalancingConfig: [{ round_robin: {} }] }),
           },
         },
       },
