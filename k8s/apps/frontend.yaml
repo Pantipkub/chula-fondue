@@ -1,0 +1,90 @@
+# React build served by nginx; /api and /uploads are proxied to the gateway.
+#
+# This replaces frontend/nginx.conf inside the cluster. The Compose version points nginx at Docker's DNS
+# (127.0.0.11) and looks the gateway up again every 5 s. Here the gateway has a Service with a stable
+# virtual IP, so nginx resolves the name once at startup (through the pod's resolv.conf) and kube-proxy
+# sends each connection to a ready gateway pod.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-nginx
+data:
+  default.conf: |
+    server {
+      listen 80;
+      root /usr/share/nginx/html;
+      client_max_body_size 30m; # up to 5 photos of 5 MB each
+
+      location /api/ {
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass http://api-gateway:3000;
+        proxy_read_timeout 30s;
+      }
+      location /uploads/ {
+        proxy_pass http://api-gateway:3000;
+      }
+      location = /health {
+        default_type text/plain;
+        return 200 'ok';
+      }
+      # Client-side routes (/admin, /tickets/:id, ...) all load index.html.
+      location / {
+        try_files $uri /index.html;
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: chula-fondue-frontend
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { memory: 128Mi }
+          volumeMounts:
+            - name: nginx
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+      volumes:
+        - name: nginx
+          configMap:
+            name: frontend-nginx

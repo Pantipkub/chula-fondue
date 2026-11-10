@@ -1,0 +1,68 @@
+# RabbitMQ projection -> PostgreSQL analytics; REST report on 3003.
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  labels:
+    app: analytics-service
+spec:
+  selector:
+    app: analytics-service
+  ports:
+    - name: http
+      port: 3003
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  labels:
+    app: analytics-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: analytics-service
+          image: chula-fondue-analytics-service
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: fondue-secrets
+                optional: true
+          env:
+            - name: ANALYTICS_PORT
+              value: "3003"
+            - name: ANALYTICS_DATABASE_URL
+              value: postgresql://fondue:fondue@postgres:5432/analytics
+            - name: RABBITMQ_URL
+              value: amqp://guest:guest@rabbitmq:5672
+          ports:
+            - name: http
+              containerPort: 3003
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { memory: 384Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
