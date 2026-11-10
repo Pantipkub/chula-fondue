@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { MongoClient } from 'mongodb';
 import { photoForm, eventually } from './e2e.mjs';
 
 assert.equal(process.env.FONDUE_ENV_FILE, '.env.demo', 'Run only against the isolated demo');
+assert.ok(process.env.ADMIN_PASSWORD, 'Set ADMIN_PASSWORD in .env.demo before running platform tests');
 const base = process.env.API_URL ?? 'http://localhost:3100';
 const run = randomUUID().slice(0, 8);
-const password = 'PlatformE2e!2026';
+const password = randomBytes(24).toString('hex');
 const evidence = [];
 async function call(path, { token, method = 'GET', json, form, key, expected = 200 } = {}) {
   const response = await fetch(base + path, { method, headers: {
@@ -19,7 +20,7 @@ async function call(path, { token, method = 'GET', json, form, key, expected = 2
   return data;
 }
 const login = async (email, pass = password) => (await call('/auth/login', { method: 'POST', json: { email, password: pass } })).accessToken;
-const admin = await login(process.env.ADMIN_EMAIL ?? 'admin@fondue.test', process.env.ADMIN_PASSWORD ?? 'FondueDemo!2026');
+const admin = await login(process.env.ADMIN_EMAIL ?? 'admin@fondue.test', process.env.ADMIN_PASSWORD);
 const department = async label => call('/departments', { token: admin, method: 'POST', expected: 201, json: { name: `${label} ${run}`, contactEmail: `${label}-${run}@example.test` } });
 const a = await department('Platform-A'); const b = await department('Platform-B');
 async function staff(label, dept) {
@@ -77,14 +78,15 @@ try {
   const inbox = await call('/notifications', { token: admin });
   assert.ok(!inbox.some(n => n.eventId === mail.eventId || 'resetUrl' in n));
   const reset = new URL(mail.resetUrl).searchParams.get('token');
-  await call('/auth/reset-password', { method: 'POST', json: { token: reset, password: 'ResetPlatform!2026' } });
+  const resetPassword = randomBytes(24).toString('hex');
+  await call('/auth/reset-password', { method: 'POST', json: { token: reset, password: resetPassword } });
   await call('/auth/reset-password', { method: 'POST', json: { token: reset, password }, expected: 400 });
   await call('/auth/me', { token: reporter, expected: 401 });
   await call('/auth/login', { method: 'POST', json: { email, password }, expected: 401 });
-  reporter = await login(email, 'ResetPlatform!2026');
+  reporter = await login(email, resetPassword);
   await call('/auth/password', { token: reporter, method: 'POST', json: { currentPassword: 'incorrect', password }, expected: 401 });
   await call('/auth/me', { token: reporter });
-  await call('/auth/password', { token: reporter, method: 'POST', json: { currentPassword: 'ResetPlatform!2026', password } });
+  await call('/auth/password', { token: reporter, method: 'POST', json: { currentPassword: resetPassword, password } });
   await call('/auth/me', { token: reporter, expected: 401 });
   reporter = await login(email);
   await call('/auth/logout', { token: reporter, method: 'POST' });

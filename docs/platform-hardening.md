@@ -67,6 +67,8 @@ npm run test:platform:ui
 
 API/browser suites create uniquely named fixtures in the demo. They require `FONDUE_ENV_FILE=.env.demo`; do not point them at production. Browser tests use installed Chrome on macOS or Playwright Chromium elsewhere, with `BROWSER_CHANNEL` available to override. CI uses a higher authentication limit for repeated fixture creation; the application default remains 30/minute/IP.
 
+Platform tests generate fixture passwords, replacement passwords and the isolated integration-test JWT secret with `node:crypto` at runtime. API/browser suites require the seeded admin's `ADMIN_PASSWORD` from the environment (normally the ignored `.env.demo`); they have no hardcoded admin-password fallback. Keep real credentials out of tracked files.
+
 The browser suite simulates a 504 after a successful report commit, then retries the same form and checks that only one report exists. Screenshots and JSON evidence are saved under ignored `test-results/`. Local results are separate from a future CI run.
 
 ### Local results — 10 November 2026

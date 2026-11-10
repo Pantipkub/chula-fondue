@@ -1,0 +1,117 @@
+{
+  "generatedAt": "2026-11-10T07:16:13.889Z",
+  "commit": "080e0083202dfc5c5af9722a2e6070d71df2337c",
+  "branch": "feature/load-test",
+  "dirty": true,
+  "sourceSha256": {
+    "perf/ticket-history.k6.js": "e1c07098d95d2723fa1c3a96f159b8166e2d1d5efd244e1f55e0bda4a99d492a",
+    "perf/lib/profile.js": "23425a2a821ef820d7b8994aed974dd8243a9c9212690ceac159327ada85c397",
+    "perf/lib/summary.js": "37244a9b1cf27e648edf78527ff650530434f0e044bf93341ef63a381b13aaaa",
+    "perf/lib/report.js": "d473fe79dd29b53ef6853f5449314a5e0e9ff3686138e6686a2e55706606168c",
+    "perf/lib/resources.js": "fede92327e4b7d63e367992ab4ec3865ad3fdce7c0e3d3c408514b81dee138b0",
+    "scripts/run-load-tests.mjs": "ea81125b9824b261c2576c1f6d5bf335f52fb09bed4a66da03cc8fe804ec4c32"
+  },
+  "host": {
+    "platform": "win32",
+    "release": "10.0.26200",
+    "cpu": "12th Gen Intel(R) Core(TM) i5-1240P",
+    "logicalCpus": 16,
+    "memoryBytes": 16890978304,
+    "node": "v24.12.0"
+  },
+  "docker": {
+    "version": "29.9.2",
+    "limits": "CPUs=16 MemoryBytes=8187629568"
+  },
+  "project": "fondue-load",
+  "network": "fondue-load_backend",
+  "k6Image": "grafana/k6:1.8.2",
+  "k6ImageId": "sha256:00fdcebafbc86cb0137d429529b1caa401a02e09025f02fc74866fa6e2b004d8",
+  "containers": [
+    {
+      "id": "2517944311dadb36dc581807401e8abb08e9c806353f3a4d7c6310cf7cfcfc1e",
+      "name": "fondue-load-analytics-service-1",
+      "imageId": "sha256:3693f5f0cbc3283b1b7cf4d1469de5d3f09d2d0b2426a816ed07cb8f21cdc9f7"
+    },
+    {
+      "id": "0b1442d204a00999123325a925b1abfa35f2038ecb913b23bf37d6f50bf7db9a",
+      "name": "fondue-load-api-gateway-1",
+      "imageId": "sha256:2212768e7f95b0edc38b49be6aa666b73ed07551711a967c2b892fe6ff13812a"
+    },
+    {
+      "id": "5129314798f44832eef30f5d185a40bd4b263b75d14b82e0197a06540b1e2bd8",
+      "name": "fondue-load-auth-service-1",
+      "imageId": "sha256:e467d9ee58de36511692445a18230b1b0ea00fc1e9b2e80885ea3e991b1d8e60"
+    },
+    {
+      "id": "093ca317662252df6aafca27eba1c9c4e1e7169fd27d3ab8a8391dd529772b8f",
+      "name": "fondue-load-department-service-1",
+      "imageId": "sha256:42cdf9f092901dd2fbf4943264000db7bbef63b3b944d55bc62e5ae1b53216c1"
+    },
+    {
+      "id": "cd58dde74c7f9eb8d9e9965a249e8f29c04c299bc23338a0a8b7950f71ec8319",
+      "name": "fondue-load-frontend-1",
+      "imageId": "sha256:0af9c4a27c39e51386d1758cdd4e1467affdce1b03d444af8309ae049f98fb84"
+    },
+    {
+      "id": "c11c38ce66e3e57997fdb309b30c22b4694ae6c5acdde70e25c1ba909100a417",
+      "name": "fondue-load-mongo-1",
+      "imageId": "sha256:4fa737b8e8c1762dc08c3a0011858aafb5f96ab5c1c0e08941d2d5448caa5dc4"
+    },
+    {
+      "id": "ee49e75feff28d69536f6db4b09eb6c974fa794914fad9611f6642177fc2fa66",
+      "name": "fondue-load-notification-service-1",
+      "imageId": "sha256:ee8b3912772227d4f91f98bee24696e03bd9a0ccfff27d43e9a1e4364778aa25"
+    },
+    {
+      "id": "0df0cfc4e7d8fc6163d0e3a76a95c01105103fbfcb252cf49b9640f3f7606ea4",
+      "name": "fondue-load-postgres-1",
+      "imageId": "sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5"
+    },
+    {
+      "id": "b37e0e0506b776365ce3799af8ad13e3d0f9b777fa99312c06b5b0a7eb659ca5",
+      "name": "fondue-load-rabbitmq-1",
+      "imageId": "sha256:8dd6e3570ddaa2ef82a6c3a8950e79c1f73893adfbdddbc374fc1f1ac8a0f5dd"
+    },
+    {
+      "id": "ef8bdf224bafd4ccfea9519c17b2e6d0fe345d134b7c5ee21871aa3f8d1a4219",
+      "name": "fondue-load-ticket-service-1",
+      "imageId": "sha256:f1565e15c0402362f04b50fc572ddc0f508ae984bf476f7f141dfac5db82072b"
+    }
+  ],
+  "configs": {
+    "average": {
+      "type": "average",
+      "quick": false,
+      "baselineVus": 50,
+      "stressVus": 100,
+      "peakVus": 200,
+      "warmupSeconds": 30,
+      "rampSeconds": 30,
+      "holdSeconds": 180,
+      "rampDownSeconds": 15,
+      "thinkSeconds": 0.1,
+      "reporters": 5,
+      "ticketsPerReporter": 5,
+      "p95LimitMs": 1000,
+      "errorLimit": 0.01
+    },
+    "stress": {
+      "type": "stress",
+      "quick": false,
+      "baselineVus": 50,
+      "stressVus": 100,
+      "peakVus": 200,
+      "warmupSeconds": 30,
+      "rampSeconds": 30,
+      "holdSeconds": 120,
+      "rampDownSeconds": 15,
+      "thinkSeconds": 0.1,
+      "reporters": 5,
+      "ticketsPerReporter": 5,
+      "p95LimitMs": 1000,
+      "errorLimit": 0.01
+    }
+  },
+  "ticketsBeforeInvocation": 75
+}

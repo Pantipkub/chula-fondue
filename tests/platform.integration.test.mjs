@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import { MongoClient } from 'mongodb';
 import { User } from '../services/auth-service/dist/user.entity.js';
@@ -17,12 +17,12 @@ import { TicketsService } from '../services/ticket-service/dist/tickets.service.
 import { InboxController } from '../services/notification-service/dist/inbox.controller.js';
 import { RecoveryController } from '../services/notification-service/dist/recovery.controller.js';
 
-process.env.JWT_SECRET ||= 'isolated-platform-integration-test-secret-2026';
+process.env.JWT_SECRET ||= randomBytes(32).toString('hex');
 const { AuthService } = await import('../services/auth-service/dist/auth.service.js');
 const demo = process.env.FONDUE_ENV_FILE === '.env.demo';
 const pgUrl = process.env.PLATFORM_TEST_DATABASE_URL ?? (demo ? `postgresql://fondue:fondue@127.0.0.1:${process.env.POSTGRES_PORT ?? 5435}/ticket` : undefined);
 const mongoUrl = process.env.PLATFORM_TEST_MONGODB_URL ?? (demo ? `mongodb://127.0.0.1:${process.env.MONGO_PORT ?? 27020}` : undefined);
-const password = 'PlatformTest!2026';
+const password = randomBytes(24).toString('hex');
 
 test('platform lifecycle: real PostgreSQL transactions', { skip: !pgUrl }, async t => {
   const schema = `platform_test_${randomUUID().replaceAll('-', '')}`;
@@ -98,13 +98,14 @@ test('platform lifecycle: real PostgreSQL transactions', { skip: !pgUrl }, async
       await assert.rejects(() => auth.resetPassword({ token: reset, password }), e => e.getStatus() === 400);
     });
     await t.test('change password validates the current password and invalidates recovery links and sessions', async () => {
+      const newPassword = randomBytes(24).toString('hex');
       const token = await login(reporter.email);
       await auth.forgotPassword(reporter.email);
       await assert.rejects(() => auth.changePassword(reporter.id, { currentPassword: 'wrong', password }), e => e.getStatus() === 401);
-      await auth.changePassword(reporter.id, { currentPassword: password, password: 'NewPlatform!2026' });
+      await auth.changePassword(reporter.id, { currentPassword: password, password: newPassword });
       await assert.rejects(() => auth.session(token), e => e.getStatus() === 401);
       await assert.rejects(() => login(reporter.email), e => e.getStatus() === 401);
-      assert.ok((await auth.login({ email: reporter.email, password: 'NewPlatform!2026' })).accessToken);
+      assert.ok((await auth.login({ email: reporter.email, password: newPassword })).accessToken);
       assert.equal(await db.getRepository(PasswordReset).countBy({ userId: reporter.id }), 0);
     });
     await t.test('recovery mail outbox survives an outage and drains after recovery', async () => {

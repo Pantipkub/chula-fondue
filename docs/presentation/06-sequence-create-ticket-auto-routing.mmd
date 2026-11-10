@@ -1,0 +1,57 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, Arial, sans-serif","fontSize":"14px","primaryColor":"#E7F2FB","primaryTextColor":"#17324D","primaryBorderColor":"#5798D0","lineColor":"#526777","actorBkg":"#DCEEFF","actorBorder":"#5798D0","actorTextColor":"#17324D","actorLineColor":"#A7B8C5","signalColor":"#344B5D","signalTextColor":"#17324D","labelBoxBkgColor":"#F1F6FA","labelBoxBorderColor":"#9BB9D0","labelTextColor":"#17324D","noteBkgColor":"#FFF8E8","noteBorderColor":"#D9B867","noteTextColor":"#59471C","activationBkgColor":"#EEF5FA","activationBorderColor":"#8EABBf","sequenceNumberColor":"#FFFFFF"}}}%%
+sequenceDiagram
+  autonumber
+  actor Reporter
+  participant GW as API Gateway
+  participant Photos as Photo Storage
+  participant TS as Ticket Service
+  participant PG as PostgreSQL
+  participant Auto as Auto Routing Worker
+  participant Dept as Department Service
+
+  Reporter->>GW: POST /tickets with report fields and optional Idempotency-Key
+  Note over GW: Require signed-in reporter and validate required fields
+  alt Matching submission already exists
+    GW->>TS: gRPC FindSubmission with reporter id and content fingerprint
+    TS->>PG: Look up reporter id and submission key
+    PG-->>TS: Matching ticket and fingerprint
+    TS-->>GW: Return the existing ticket
+    GW-->>Reporter: Return prior result without creating a duplicate
+  else New submission or no matching key
+    opt Idempotency-Key supplied
+      GW->>TS: gRPC FindSubmission with reporter id and content fingerprint
+      TS->>PG: Look up reporter id and submission key
+      PG-->>TS: No matching submission
+      TS-->>GW: Continue with new ticket
+    end
+    Note over GW,TS: Reusing a key with different content returns 409
+    opt Photos attached
+      GW->>Photos: Store photos in Cloudinary or local uploads volume
+      Photos-->>GW: Photo URLs
+    end
+    GW->>TS: gRPC CreateTicket with reporter identity key and fingerprint
+    TS->>PG: Begin transaction and write SUBMITTED ticket history and outbox
+    opt Automatic routing enabled
+      TS->>PG: Also create PENDING routing job
+    end
+    PG-->>TS: Commit successful
+    TS-->>GW: Ticket id and SUBMITTED status
+    GW-->>Reporter: 201 ticket created
+  end
+
+  opt Automatic routing enabled
+    Note over Auto,PG: Worker polls every 2 s and leases a due job
+    Auto->>PG: Claim routing job and load ticket
+    PG-->>Auto: Ticket category and lease token
+    Auto->>Dept: POST /routing-rules/match with category and 3 s timeout
+    alt Exactly one enabled rule matches
+      Dept-->>Auto: MATCHED with department and rule id
+      Auto->>PG: Atomic update ASSIGNED plus history outbox and job DONE
+      PG-->>Auto: Commit successful
+    else No rule or ambiguous rules
+      Dept-->>Auto: NO_RULE or AMBIGUOUS_RULES
+      Auto->>PG: Keep ticket SUBMITTED and mark routing job REVIEW
+      PG-->>Auto: Review state saved
+    end
+    Note over Auto,Dept: Transient errors retry with backoff. Stale results are ignored
+  end

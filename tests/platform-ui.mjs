@@ -1,21 +1,22 @@
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { photoForm, eventually } from './e2e.mjs';
 
 assert.equal(process.env.FONDUE_ENV_FILE, '.env.demo', 'Run only against the isolated demo');
+assert.ok(process.env.ADMIN_PASSWORD, 'Set ADMIN_PASSWORD in .env.demo before running platform tests');
 const base = process.env.WEB_URL ?? 'http://127.0.0.1:8080';
 const api = process.env.API_URL ?? 'http://localhost:3100';
 const run = randomUUID().slice(0, 8);
-const password = 'PlatformUi!2026';
+const password = randomBytes(24).toString('hex');
 async function call(path, token, method = 'GET', json, form) {
   const res = await fetch(api + path, { method, headers: { ...(token && { Authorization: `Bearer ${token}` }), ...(json && { 'Content-Type': 'application/json' }) }, body: form ?? (json && JSON.stringify(json)), signal: AbortSignal.timeout(15000) });
   assert.ok(res.ok, `fixture ${method} ${path}: ${res.status}`);
   return res.status === 204 ? null : res.json();
 }
 const login = async (email, pass = password) => (await call('/auth/login', null, 'POST', { email, password: pass })).accessToken;
-const admin = await login(process.env.ADMIN_EMAIL ?? 'admin@fondue.test', process.env.ADMIN_PASSWORD ?? 'FondueDemo!2026');
+const admin = await login(process.env.ADMIN_EMAIL ?? 'admin@fondue.test', process.env.ADMIN_PASSWORD);
 const email = `ui-platform-${run}@example.test`;
 await call('/auth/register', null, 'POST', { email, password });
 const reporter = await login(email);
@@ -98,9 +99,10 @@ try {
   console.log('PASS: retry after losing a successful submission response creates one ticket');
 
   await reportPage.goto(base + '/account');
+  const newPassword = randomBytes(24).toString('hex');
   await reportPage.getByLabel(/^รหัสผ่านปัจจุบัน/).fill('wrong-password');
-  await reportPage.getByLabel(/^รหัสผ่านใหม่/).fill('ChangedPlatformUi!2026');
-  await reportPage.getByLabel(/^ยืนยันรหัสผ่านใหม่/).fill('ChangedPlatformUi!2026');
+  await reportPage.getByLabel(/^รหัสผ่านใหม่/).fill(newPassword);
+  await reportPage.getByLabel(/^ยืนยันรหัสผ่านใหม่/).fill(newPassword);
   await reportPage.getByRole('button', { name: 'เปลี่ยนรหัสผ่าน', exact: true }).click();
   await reportPage.getByText('รหัสผ่านปัจจุบันไม่ถูกต้อง', { exact: true }).waitFor();
   await reportPage.getByLabel(/^รหัสผ่านปัจจุบัน/).fill(password);

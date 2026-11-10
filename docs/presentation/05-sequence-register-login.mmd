@@ -1,0 +1,28 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, Arial, sans-serif","fontSize":"14px","primaryColor":"#E7F2FB","primaryTextColor":"#17324D","primaryBorderColor":"#5798D0","lineColor":"#526777","actorBkg":"#DCEEFF","actorBorder":"#5798D0","actorTextColor":"#17324D","actorLineColor":"#A7B8C5","signalColor":"#344B5D","signalTextColor":"#17324D","labelBoxBkgColor":"#F1F6FA","labelBoxBorderColor":"#9BB9D0","labelTextColor":"#17324D","noteBkgColor":"#FFF8E8","noteBorderColor":"#D9B867","noteTextColor":"#59471C","activationBkgColor":"#EEF5FA","activationBorderColor":"#8EABBf","sequenceNumberColor":"#FFFFFF"}}}%%
+sequenceDiagram
+  autonumber
+  actor Reporter
+  participant GW as API Gateway
+  participant Auth as Auth Service
+  participant DB as PostgreSQL
+
+  Reporter->>GW: POST /auth/register or POST /auth/login
+  GW->>GW: Apply auth rate limit
+  alt Register new reporter
+    GW->>Auth: Forward registration request over REST
+    Auth->>DB: Check normalized email
+    DB-->>Auth: Email not registered
+    Note over Auth: Hash password with scrypt and save reporter account
+    Auth->>DB: Insert user record
+    DB-->>Auth: User profile
+    Auth-->>GW: Created account profile
+    GW-->>Reporter: 201 account created. Login separately for a token
+  else Login existing reporter
+    GW->>Auth: Forward login request over REST
+    Auth->>DB: Find user by normalized email
+    DB-->>Auth: User and password hash
+    Note over Auth: Require active account and verify password with scrypt
+    Auth-->>GW: HS256 access token with tokenVersion and user profile
+    GW-->>Reporter: 200 access token and profile
+    Note over Auth: Invalid email or password returns the same 401 response
+  end
