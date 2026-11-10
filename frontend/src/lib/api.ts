@@ -40,11 +40,11 @@ export const setUnauthorizedHandler = (fn: () => void) => { onUnauthorized = fn;
 // Turns the gateway's error body into a short Thai message; the original text is kept for the details.
 function friendly(status: number, raw: string) {
   const accountMessages: [RegExp, string][] = [
-    [/Submission key was already used/i, 'ข้อมูลเปลี่ยนจากคำขอเดิม กรุณาเริ่มส่งเรื่องใหม่'],
+    [/Submission key was already used/i, 'ข้อมูลไม่ตรงกับคำขอเดิม กรุณากดส่งแจ้งซ่อมอีกครั้ง'],
     [/Current password is incorrect/i, 'รหัสผ่านปัจจุบันไม่ถูกต้อง'],
     [/Cannot disable your own account/i, 'ไม่สามารถปิดใช้งานบัญชีของตัวเองได้'],
     [/Cannot remove the last active admin/i, 'ต้องมีผู้ดูแลระบบที่ใช้งานได้อย่างน้อย 1 บัญชี'],
-    [/Department still has active staff/i, 'หน่วยงานนี้ยังมี Staff ที่ใช้งานอยู่ กรุณาย้ายหรือปิดบัญชีก่อน'],
+    [/Department still has active staff/i, 'หน่วยงานนี้ยังมีบัญชีเจ้าหน้าที่ที่ใช้งานอยู่ กรุณาย้ายหรือปิดบัญชีก่อน'],
     [/Department still has open tickets/i, 'หน่วยงานนี้ยังมีงานค้าง กรุณาย้ายงานหรือดำเนินการให้เสร็จก่อน'],
     [/does not exist or is inactive/i, 'หน่วยงานนี้ไม่มีอยู่หรือปิดใช้งานแล้ว กรุณาเลือกหน่วยงานใหม่'],
   ];
@@ -55,10 +55,10 @@ function friendly(status: number, raw: string) {
   if (status === 401) return raw.includes('Invalid email') ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : 'กรุณาเข้าสู่ระบบอีกครั้ง';
   if (status === 403) return 'คุณไม่มีสิทธิ์ทำรายการนี้';
   if (status === 404) return 'ไม่พบข้อมูลที่ต้องการ';
-  if (status === 409 && raw.includes('routing rule already exists')) return 'หมวดนี้มีกฎที่เปิดใช้อยู่แล้ว กรุณาแก้ไขกฎเดิม';
-  if (status === 409 && raw.includes('active routing rules')) return 'กรุณาปิดหรือย้ายกฎส่งต่อที่ใช้หน่วยงานนี้ก่อนลบ';
+  if (status === 409 && raw.includes('routing rule already exists')) return 'หมวดนี้เลือกหน่วยงานรับงานไว้แล้ว';
+  if (status === 409 && raw.includes('active routing rules')) return 'กรุณายกเลิกการส่งต่ออัตโนมัติที่ใช้หน่วยงานนี้ก่อน';
   if (status === 409 && raw.includes('routing is disabled')) return 'ระบบส่งต่ออัตโนมัติยังไม่เปิดใช้งาน';
-  if (status === 409) return raw.includes('exists') || raw.includes('already') ? 'มีข้อมูลนี้อยู่แล้ว' : 'สถานะของเรื่องเปลี่ยนไปแล้ว รีเฟรชหน้าแล้วลองใหม่';
+  if (status === 409) return raw.includes('exists') || raw.includes('already') ? 'มีข้อมูลนี้อยู่แล้ว' : 'สถานะงานเปลี่ยนไปแล้ว กรุณารีเฟรชหน้า';
   const known: [RegExp, string][] = [
     [/Reset link is invalid or expired/i, 'ลิงก์ตั้งรหัสผ่านไม่ถูกต้อง หมดอายุ หรือถูกใช้แล้ว กรุณาขอลิงก์ใหม่'],
     [/password must be longer/i, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'],
@@ -72,7 +72,7 @@ function friendly(status: number, raw: string) {
     [/(category|location|description|reason).*(required|empty|missing)|Missing/i, 'กรุณากรอกข้อมูลให้ครบ'],
   ];
   const hit = known.find(([re]) => re.test(raw));
-  return hit ? hit[1] : raw || 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง';
+  return hit ? hit[1] : raw || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง';
 }
 
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
@@ -86,7 +86,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   try {
     res = await fetch(`/api${path}`, { ...init, headers, body });
   } catch {
-    throw new ApiError(0, 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบว่า backend ทำงานอยู่');
+    throw new ApiError(0, 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง');
   }
   const text = await res.text();
   const data = text ? (() => { try { return JSON.parse(text); } catch { return text; } })() : null;

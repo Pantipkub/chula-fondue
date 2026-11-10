@@ -32,18 +32,18 @@ const CANVAS = '#FFF8F6';
 const FONT = "'IBM Plex Sans Thai','Leelawadee UI','Thonburi',Tahoma,Arial,sans-serif";
 
 const STATUS: Record<string, { label: string; tone: Tone }> = {
-  SUBMITTED: { label: 'ส่งเรื่องแล้ว', tone: { bg: '#FFF9D6', fg: '#8A6A12' } },
-  ASSIGNED: { label: 'มอบหมายแล้ว', tone: { bg: '#FFDCDC', fg: '#8F4553' } },
-  IN_PROGRESS: { label: 'กำลังดำเนินการ', tone: { bg: '#EEE6F6', fg: '#6B4E9B' } },
-  RESOLVED: { label: 'แก้ไขเสร็จแล้ว', tone: { bg: '#E9F0DE', fg: '#4F6638' } },
-  CLOSED: { label: 'ปิดเรื่องแล้ว', tone: { bg: '#F4EFEF', fg: '#6E5F61' } },
+  SUBMITTED: { label: 'รอรับเรื่อง', tone: { bg: '#FFF9D6', fg: '#8A6A12' } },
+  ASSIGNED: { label: 'รับเรื่องแล้ว', tone: { bg: '#FFDCDC', fg: '#8F4553' } },
+  IN_PROGRESS: { label: 'กำลังซ่อม', tone: { bg: '#EEE6F6', fg: '#6B4E9B' } },
+  RESOLVED: { label: 'รอตรวจรับ', tone: { bg: '#E9F0DE', fg: '#4F6638' } },
+  CLOSED: { label: 'ปิดงาน', tone: { bg: '#F4EFEF', fg: '#6E5F61' } },
   REJECTED: { label: 'ไม่รับเรื่อง', tone: { bg: '#FBE3E0', fg: '#A63A33' } },
-  CANCELLED: { label: 'ยกเลิกแล้ว', tone: { bg: '#F4EFEF', fg: '#6E5F61' } },
+  CANCELLED: { label: 'ยกเลิก', tone: { bg: '#F4EFEF', fg: '#6E5F61' } },
 };
 const CATEGORY: Record<string, string> = {
-  electrical: 'ไฟฟ้า', plumbing: 'ประปา', 'air conditioning': 'แอร์', 'it / network': 'ไอที / เน็ต', building: 'อาคาร', other: 'อื่น ๆ',
+  electrical: 'ไฟฟ้า', plumbing: 'ประปา', 'air conditioning': 'เครื่องปรับอากาศ', 'it / network': 'ไอที / เครือข่าย', building: 'อาคารสถานที่', other: 'อื่น ๆ',
 };
-const STEPS = ['ส่งเรื่อง', 'มอบหมาย', 'ดำเนินการ', 'แก้ไขเสร็จ', 'ปิดเรื่อง'];
+const STEPS = ['แจ้งซ่อม', 'รับเรื่อง', 'กำลังซ่อม', 'ตรวจรับงาน', 'ปิดงาน'];
 const STEP_INDEX: Record<string, number> = { SUBMITTED: 0, ASSIGNED: 1, IN_PROGRESS: 2, RESOLVED: 3, CLOSED: 4 };
 
 export const shortId = (id: string) => '#' + id.slice(0, 8).toUpperCase();
@@ -73,17 +73,17 @@ function copyFor(event: EmailEvent, audience: Audience) {
   const autoClosed = event.status === 'CLOSED' && /automatic/i.test(event.note ?? '');
   const reopened = event.status === 'IN_PROGRESS' && event.fromStatus === 'RESOLVED';
   if (audience === 'department') {
-    if (event.status === 'ASSIGNED') return { title: 'มีเรื่องแจ้งซ่อมส่งถึงหน่วยงานของคุณ', lead: 'กรุณาตรวจสอบรายละเอียดและกด “เริ่มดำเนินการ” เมื่อเจ้าหน้าที่รับงาน' };
-    if (reopened) return { title: 'ผู้แจ้งขอให้แก้ไขเพิ่มเติม', lead: 'ผู้แจ้งตรวจผลแล้วพบว่าปัญหายังไม่หมด เรื่องนี้กลับมาอยู่ในสถานะกำลังดำเนินการ' };
-    if (event.status === 'CANCELLED') return { title: 'ผู้แจ้งยกเลิกเรื่องแล้ว', lead: 'ไม่ต้องดำเนินการต่อสำหรับเรื่องนี้' };
-    return { title: 'เรื่องที่มอบหมายถูกปิดโดยผู้ดูแล', lead: 'ผู้ดูแลระบบไม่รับเรื่องนี้ จึงไม่ต้องดำเนินการต่อ' };
+    if (event.status === 'ASSIGNED') return { title: 'มีงานแจ้งซ่อมใหม่ถึงหน่วยงานของคุณ', lead: 'กรุณาตรวจสอบรายละเอียด และกด “เริ่มซ่อม” เมื่อช่างเข้าดำเนินการ' };
+    if (reopened) return { title: 'ผู้แจ้งส่งงานกลับให้แก้ไข', lead: 'ผู้แจ้งตรวจหน้างานแล้วยังพบปัญหา งานกลับมาอยู่ในสถานะกำลังซ่อม' };
+    if (event.status === 'CANCELLED') return { title: 'ผู้แจ้งยกเลิกการแจ้งซ่อม', lead: 'ไม่ต้องดำเนินการต่อสำหรับงานนี้' };
+    return { title: 'ผู้ดูแลระบบยกเลิกงานนี้', lead: 'งานนี้ไม่อยู่ในขอบเขตงานซ่อม ไม่ต้องดำเนินการต่อ' };
   }
   switch (event.status) {
-    case 'IN_PROGRESS': return { title: 'เจ้าหน้าที่เริ่มดำเนินการแล้ว', lead: 'หน่วยงานที่รับผิดชอบกำลังแก้ไขปัญหาที่คุณแจ้ง' };
-    case 'RESOLVED': return { title: 'แก้ไขเสร็จแล้ว รอคุณยืนยันผล', lead: 'กรุณาตรวจผลและกด “ยืนยัน” หรือ “ขอแก้ไขใหม่” หากไม่ดำเนินการ ระบบจะปิดเรื่องให้อัตโนมัติใน 7 วัน' };
-    case 'CLOSED': return { title: 'ปิดเรื่องเรียบร้อย', lead: autoClosed ? 'ระบบปิดเรื่องให้อัตโนมัติ เนื่องจากครบ 7 วันหลังแก้ไขเสร็จ' : 'ขอบคุณที่ยืนยันผลและช่วยดูแลมหาวิทยาลัย' };
-    case 'REJECTED': return { title: 'เรื่องของคุณไม่ได้รับการดำเนินการ', lead: 'ผู้ดูแลระบบตรวจสอบแล้วและไม่รับเรื่องนี้ โปรดดูเหตุผลด้านล่าง' };
-    default: return { title: 'สถานะเรื่องของคุณเปลี่ยนแปลง', lead: 'เปิดระบบเพื่อดูรายละเอียดล่าสุด' };
+    case 'IN_PROGRESS': return { title: 'ช่างเริ่มซ่อมแล้ว', lead: 'หน่วยงานที่รับผิดชอบกำลังดำเนินการตามที่คุณแจ้ง' };
+    case 'RESOLVED': return { title: 'ซ่อมเสร็จแล้ว กรุณาตรวจรับงาน', lead: 'กรุณาตรวจหน้างาน แล้วกด “ตรวจรับ” หรือ “ส่งกลับแก้ไข” หากไม่ตรวจรับภายใน 7 วัน ระบบจะปิดงานให้อัตโนมัติ' };
+    case 'CLOSED': return { title: 'ปิดงานเรียบร้อย', lead: autoClosed ? 'ระบบปิดงานให้อัตโนมัติ เนื่องจากครบ 7 วันหลังซ่อมเสร็จ' : 'ขอบคุณที่ตรวจรับงาน' };
+    case 'REJECTED': return { title: 'ไม่รับเรื่องแจ้งซ่อมของคุณ', lead: 'ผู้ดูแลระบบตรวจสอบแล้ว โปรดดูเหตุผลด้านล่าง' };
+    default: return { title: 'สถานะงานซ่อมของคุณมีการเปลี่ยนแปลง', lead: 'เข้าสู่ระบบเพื่อดูรายละเอียด' };
   }
 }
 
@@ -119,7 +119,7 @@ export function buildEmail(event: EmailEvent): BuiltEmail {
   const description = clip(event.description ?? '', 400);
 
   const details = [
-    row('เลขที่เรื่อง', `<span style="font-family:Consolas,Menlo,monospace;letter-spacing:.5px;">${escapeHtml(id)}</span>`),
+    row('เลขที่แจ้งซ่อม', `<span style="font-family:Consolas,Menlo,monospace;letter-spacing:.5px;">${escapeHtml(id)}</span>`),
     event.category ? row('หมวด', escapeHtml(categoryLabel(event.category))) : '',
     event.location ? row('สถานที่', escapeHtml(event.location)) : '',
     event.departmentName ? row('หน่วยงาน', escapeHtml(event.departmentName)) : '',
@@ -137,7 +137,7 @@ export function buildEmail(event: EmailEvent): BuiltEmail {
   <tr><td style="padding:0 4px 18px;">
     <table role="presentation" cellpadding="0" cellspacing="0"><tr>
       <td style="width:36px;height:36px;border-radius:10px;background:${BRAND};text-align:center;font:700 18px/36px ${FONT};color:#fff;">F</td>
-      <td style="padding-left:10px;font:700 17px/1.2 ${FONT};color:${INK};">Fondue<br><span style="font:400 12px/1.4 ${FONT};color:${MUTED};">ระบบแจ้งซ่อม จุฬาฯ</span></td>
+      <td style="padding-left:10px;font:700 17px/1.2 ${FONT};color:${INK};">Chula Fondue</td>
     </tr></table>
   </td></tr>
   <tr><td style="background:#ffffff;border:1px solid ${LINE};border-radius:20px;padding:28px 28px 24px;">
@@ -160,7 +160,7 @@ export function buildEmail(event: EmailEvent): BuiltEmail {
   const text = [
     copy.title, '', copy.lead, '',
     `สถานะ: ${status.label}`,
-    `เลขที่เรื่อง: ${id}`,
+    `เลขที่แจ้งซ่อม: ${id}`,
     event.category ? `หมวด: ${categoryLabel(event.category)}` : null,
     event.location ? `สถานที่: ${event.location}` : null,
     event.departmentName ? `หน่วยงาน: ${event.departmentName}` : null,
@@ -170,7 +170,7 @@ export function buildEmail(event: EmailEvent): BuiltEmail {
     '', '— Chula Fondue (อีเมลอัตโนมัติ กรุณาอย่าตอบกลับ)',
   ].filter((line) => line !== null).join('\n');
 
-  return { subject: `[Fondue ${id}] ${copy.title}`, text, html };
+  return { subject: `[Chula Fondue ${id}] ${copy.title}`, text, html };
 }
 
 // RFC 2045 asks for base64 lines of at most 76 characters.

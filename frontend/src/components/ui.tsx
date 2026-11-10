@@ -1,9 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import { Children, createContext, isValidElement, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import type { ButtonHTMLAttributes, ChangeEvent, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import * as RS from '@radix-ui/react-select';
 import {
-  AlertTriangle, ArrowLeft, BarChart3, Bell, Building2, Calendar, Camera, Check, ChevronDown, ChevronRight, ClipboardList, Clock, Copy, Droplet, Eye,
-  Filter, Heart, ImageIcon, Inbox, Info, Loader2, LogOut, Lock, Mail, MapPin, Menu, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Route, Search, Send,
-  Shield, Sparkles, Ticket as TicketIcon, Trash2, Upload, User, Users, Wifi, Wind, Wrench, X, Zap,
+  AlertTriangle, ArrowLeft, BarChart3, Bell, Building2, Calendar, Camera, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, Copy,
+  Droplet, ExternalLink, Eye, EyeOff, Filter, ImageIcon, Inbox, Info, Loader2, LogOut, Lock, Mail, MapPin, Menu, MoreHorizontal, Pencil, Play, Plus, RefreshCw,
+  RotateCcw, Route, Search, Send, Settings, Shield, Ticket as TicketIcon, Trash2, Upload, User, Users, Wifi, Wind, Wrench, X, Zap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -11,15 +12,23 @@ import type { HistoryEntry, Status } from '../lib/api';
 import { STATUS, STEPS, describe, fmtShort, stepIndex } from '../lib/format';
 
 const ICONS: Record<string, LucideIcon> = {
-  alert: AlertTriangle, back: ArrowLeft, chart: BarChart3, bell: Bell, building: Building2, calendar: Calendar, camera: Camera, check: Check, down: ChevronDown,
-  right: ChevronRight, list: ClipboardList, clock: Clock, copy: Copy, droplet: Droplet, eye: Eye, filter: Filter, heart: Heart, image: ImageIcon, inbox: Inbox,
-  info: Info, loader: Loader2, logout: LogOut, lock: Lock, mail: Mail, pin: MapPin, menu: Menu, more: MoreHorizontal, pencil: Pencil, play: Play, plus: Plus, undo: RotateCcw,
-  route: Route, search: Search, send: Send, shield: Shield, sparkles: Sparkles, ticket: TicketIcon, trash: Trash2, upload: Upload, user: User, users: Users,
-  wifi: Wifi, wind: Wind, wrench: Wrench, x: X, zap: Zap,
+  alert: AlertTriangle, back: ArrowLeft, chart: BarChart3, bell: Bell, building: Building2, calendar: Calendar, camera: Camera, check: Check, done: CheckCircle2,
+  down: ChevronDown, left: ChevronLeft, right: ChevronRight, list: ClipboardList, clock: Clock, copy: Copy, droplet: Droplet, external: ExternalLink, eye: Eye,
+  eyeOff: EyeOff, filter: Filter, image: ImageIcon, inbox: Inbox, info: Info, loader: Loader2, logout: LogOut, lock: Lock, mail: Mail, pin: MapPin, menu: Menu,
+  more: MoreHorizontal, pencil: Pencil, play: Play, plus: Plus, refresh: RefreshCw, undo: RotateCcw, route: Route, search: Search, send: Send, settings: Settings,
+  shield: Shield, ticket: TicketIcon, trash: Trash2, upload: Upload, user: User, users: Users, wifi: Wifi, wind: Wind, wrench: Wrench, x: X, zap: Zap,
 };
 export function Icon({ name, size = 18, className }: { name: string; size?: number; className?: string }) {
   const C = ICONS[name] ?? Info;
-  return <C size={size} strokeWidth={1.8} className={className} aria-hidden />;
+  return <C size={size} strokeWidth={1.75} className={className} aria-hidden />;
+}
+/** Icon-only button; `label` becomes both the accessible name and the hover tooltip. */
+export function IconButton({ icon, label, busy, className = '', ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { icon: string; label: string; busy?: boolean }) {
+  return (
+    <button type="button" aria-label={label} title={label} {...rest} className={`icon-btn ${className}`} disabled={busy || rest.disabled}>
+      <Icon name={busy ? 'loader' : icon} className={busy ? 'spin' : undefined} />
+    </button>
+  );
 }
 export function Bubble({ icon, tone = 'pink', size = 40, iconSize }: { icon: string; tone?: string; size?: number; iconSize?: number }) {
   return <span className={`bubble tone-${tone}`} style={{ width: size, height: size }}><Icon name={icon} size={iconSize ?? Math.round(size / 2)} /></span>;
@@ -47,11 +56,49 @@ function Shell({ label, required, help, error, id, children }: FieldProps & { ch
     </div>
   );
 }
-export function Input({ label, required, help, error, icon, id, ...rest }: FieldProps & InputHTMLAttributes<HTMLInputElement>) {
-  return <Shell {...{ label, required, help, error, id }}><div className={`control${error ? ' error' : ''}`}>{icon && <Icon name={icon} />}<input id={id} required={required} aria-invalid={!!error} {...rest} /></div></Shell>;
+export function Input({ label, required, help, error, icon, id, suffix, ...rest }: FieldProps & InputHTMLAttributes<HTMLInputElement> & { suffix?: ReactNode }) {
+  return <Shell {...{ label, required, help, error, id }}><div className={`control${error ? ' error' : ''}`}>{icon && <Icon name={icon} />}<input id={id} required={required} aria-invalid={!!error} {...rest} />{suffix}</div></Shell>;
 }
-export function Select({ label, required, help, error, icon, id, children, ...rest }: FieldProps & SelectHTMLAttributes<HTMLSelectElement>) {
-  return <Shell {...{ label, required, help, error, id }}><div className={`control${error ? ' error' : ''}`}>{icon && <Icon name={icon} />}<select id={id} required={required} {...rest}>{children}</select><Icon name="down" /></div></Shell>;
+/** Password input with a show/hide toggle inside the field. */
+export function PasswordInput(props: Omit<FieldProps & InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  const [show, setShow] = useState(false);
+  return <Input icon="lock" {...props} type={show ? 'text' : 'password'}
+    suffix={<button type="button" className="suffix" aria-label={show ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'} title={show ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'} aria-pressed={show} onClick={() => setShow((s) => !s)}><Icon name={show ? 'eyeOff' : 'eye'} /></button>} />;
+}
+// Radix items cannot use '' as a value, so an "all"/"none" option travels under this key.
+const EMPTY = '__empty__';
+type Opt = { value: string; label: string; disabled?: boolean };
+const optionsOf = (children: ReactNode): Opt[] => Children.toArray(children).flatMap((c) =>
+  isValidElement<{ value?: unknown; children?: ReactNode; disabled?: boolean }>(c) && c.type === 'option'
+    ? [{ value: String(c.props.value ?? ''), label: Children.toArray(c.props.children).join(''), disabled: c.props.disabled }] : []);
+/** Styled dropdown that keeps the native-select API (`<option>` children, `onChange(e => e.target.value)`). */
+export function Select({ label, required, help, error, icon, id, children, value, onChange, disabled, name, 'aria-label': ariaLabel }: FieldProps & SelectHTMLAttributes<HTMLSelectElement>) {
+  const opts = optionsOf(children);
+  const placeholder = opts.find((o) => o.value === '' && o.disabled)?.label;
+  const items = opts.filter((o) => !(o.value === '' && o.disabled));
+  const current = String(value ?? '');
+  const rootValue = current === '' ? (items.some((o) => o.value === '') ? EMPTY : '') : current;
+  const change = (v: string) => onChange?.({ target: { value: v === EMPTY ? '' : v } } as ChangeEvent<HTMLSelectElement>);
+  return (
+    <Shell {...{ label, required, help, error, id }}>
+      <RS.Root value={rootValue} onValueChange={change} disabled={disabled} required={required} name={name}>
+        <RS.Trigger id={id} className={`control select-trigger${error ? ' error' : ''}`} aria-label={ariaLabel} aria-invalid={!!error} data-value={current}>
+          {icon && <Icon name={icon} />}<span className="select-value"><RS.Value placeholder={placeholder} /></span><RS.Icon asChild><span className="select-chevron"><Icon name="down" /></span></RS.Icon>
+        </RS.Trigger>
+        <RS.Portal>
+          <RS.Content className="select-menu" position="popper" sideOffset={6} collisionPadding={8}>
+            <RS.Viewport>
+              {items.map((o) => (
+                <RS.Item key={o.value || EMPTY} value={o.value || EMPTY} disabled={o.disabled} className="select-item" data-value={o.value}>
+                  <RS.ItemText>{o.label}</RS.ItemText><RS.ItemIndicator><Icon name="check" size={16} /></RS.ItemIndicator>
+                </RS.Item>
+              ))}
+            </RS.Viewport>
+          </RS.Content>
+        </RS.Portal>
+      </RS.Root>
+    </Shell>
+  );
 }
 export function Textarea({ label, required, help, error, id, ...rest }: FieldProps & TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <Shell {...{ label, required, help, error, id }}><div className={`control ta${error ? ' error' : ''}`}><textarea id={id} required={required} {...rest} /></div></Shell>;
@@ -73,7 +120,7 @@ export function Gallery({ urls }: { urls: string[] }) {
   const list = urls.length ? urls : [''];
   return (
     <div className="card gallery" style={{ padding: 16 }}>
-      <a href={list[i] || undefined} target="_blank" rel="noreferrer"><Photo src={list[i]} className="main" alt="รูปประกอบเรื่อง" /></a>
+      <a href={list[i] || undefined} target="_blank" rel="noreferrer"><Photo src={list[i]} className="main" alt="รูปจุดชำรุด" /></a>
       {list.length > 1 && <div className="thumbs">{list.map((u, k) => <button key={u + k} className={k === i ? 'on' : ''} onClick={() => setI(k)} aria-label={`รูปที่ ${k + 1}`}><Photo src={u} tone={k} /></button>)}</div>}
     </div>
   );
@@ -91,7 +138,7 @@ export function PhotoPicker({ files, onChange, max = 5, compact }: { files: File
     const ok: File[] = [];
     for (const f of Array.from(list)) {
       if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { setErr(`${f.name}: รองรับเฉพาะ JPG, PNG หรือ WebP`); continue; }
-      if (f.size > 5 * 1024 * 1024) { setErr(`${f.name}: ใหญ่เกิน 5 MB`); continue; }
+      if (f.size > 5 * 1024 * 1024) { setErr(`${f.name}: ขนาดเกิน 5 MB`); continue; }
       ok.push(f);
     }
     const next = [...files, ...ok];
@@ -106,8 +153,8 @@ export function PhotoPicker({ files, onChange, max = 5, compact }: { files: File
           onClick={() => input.current?.click()} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && input.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={(e) => { e.preventDefault(); setDrag(false); add(e.dataTransfer.files); }}>
           <span className="bubble" style={{ width: 48, height: 48, background: '#fff', color: 'var(--pink-700)' }}><Icon name="upload" size={22} /></span>
-          <span className="strong" style={{ color: 'var(--pink-800)' }}>ลากรูปมาวางที่นี่ หรือ คลิกเพื่อเลือกไฟล์</span>
-          <span className="xs muted">JPG / PNG / WebP · ไม่เกิน 5 MB ต่อรูป · สูงสุด {max} รูป</span>
+          <span className="strong" style={{ color: 'var(--pink-800)' }}>ลากรูปมาวาง หรือคลิกเพื่อเลือกไฟล์</span>
+          <span className="xs muted">JPG, PNG, WebP · ไม่เกิน 5 MB ต่อรูป · สูงสุด {max} รูป</span>
           <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => { add(e.target.files); e.target.value = ''; }} />
         </div>
       )}
@@ -119,7 +166,7 @@ export function PhotoPicker({ files, onChange, max = 5, compact }: { files: File
               <button type="button" className="x" aria-label="ลบรูป" onClick={() => onChange(files.filter((_, k) => k !== i))}><Icon name="x" size={14} /></button>
             </div>
           ))}
-          <div className="stack" style={{ ['--gap' as string]: '2px' }}><span className="strong small">{files.length} / {max} รูป</span>{files.length < max && <span className="xs muted">เพิ่มได้อีก {max - files.length} รูป</span>}</div>
+          <div className="stack" style={{ ['--gap' as string]: '2px' }}><span className="strong small" style={{ fontVariantNumeric: 'tabular-nums' }}>{files.length} / {max} รูป</span>{files.length < max && <span className="xs muted">เพิ่มได้อีก {max - files.length} รูป</span>}</div>
         </div>
       )}
       {err && <span className="help error">{err}</span>}
@@ -164,7 +211,7 @@ export function Timeline({ history, reporterLabel = 'ผู้แจ้ง' }: {
       {rows.map((h, i) => {
         const d = describe(h);
         const who = /^(Automatically assigned to |Automatic routing needs review: |Automatically closed after )/.test(h.note)
-          ? 'ระบบอัตโนมัติ' : /^(Category changed to |Automatic routing requested by admin)/.test(h.note)
+          ? 'ระบบ' : /^(Category changed to |Automatic routing requested by admin)/.test(h.note)
             ? 'ผู้ดูแลระบบ' : ['SUBMITTED', 'CANCELLED', 'CLOSED'].includes(h.toStatus) || d.quote && h.toStatus === 'IN_PROGRESS'
               ? reporterLabel : h.toStatus === 'ASSIGNED' || h.toStatus === 'REJECTED' ? 'ผู้ดูแลระบบ' : 'เจ้าหน้าที่';
         return (
@@ -207,7 +254,7 @@ export const Empty = ({ icon = 'inbox', title, children }: { icon?: string; titl
 );
 export const Skeleton = ({ h = 120 }: { h?: number }) => <div className="skeleton" style={{ height: h }} />;
 export const Meta = ({ icon, children }: { icon: string; children: ReactNode }) => <span className="meta"><Icon name={icon} size={15} />{children}</span>;
-export const Logo = ({ to = '/' }: { to?: string }) => <Link className="logo" to={to}><span className="mark"><Icon name="wrench" size={20} /></span><span><b>Fondue</b><small>ระบบแจ้งซ่อม จุฬาฯ</small></span></Link>;
+export const Logo = ({ to = '/' }: { to?: string }) => <Link className="logo" to={to}><span className="mark"><Icon name="wrench" size={20} /></span><span><b>Chula Fondue</b></span></Link>;
 
 /** Loads data once (and again when `deps` change); returns [data, error, reload]. */
 export function useLoad<T>(fn: () => Promise<T>, deps: unknown[] = [], poll?: (data: T) => boolean) {

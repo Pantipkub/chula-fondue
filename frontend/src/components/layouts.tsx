@@ -3,9 +3,10 @@ import type { ReactNode } from 'react';
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { Role } from '../lib/api';
 import { homeFor, useAuth } from '../lib/auth';
-import { Button, Icon, Logo } from './ui';
+import { Button, Icon, IconButton, Logo } from './ui';
 
 const initials = (email: string) => (email ? email.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2) : '?');
+const ROLE_LABEL: Record<string, string> = { REPORTER: 'ผู้แจ้ง', STAFF: 'เจ้าหน้าที่', ADMIN: 'ผู้ดูแลระบบ', GUEST: 'ผู้เยี่ยมชม' };
 
 function useMobileMenu() {
   const [open, setOpen] = useState(false);
@@ -31,36 +32,39 @@ export function TopNav() {
   const mobile = useMobileMenu();
   const role = session?.role;
   const links = role === 'REPORTER'
-    ? [['/report', 'แจ้งปัญหา'], ['/my', 'เรื่องของฉัน'], ['/notifications', 'การแจ้งเตือน'], ['/track', 'ติดตามสถานะ']]
-    : [['/', 'หน้าแรก'], ['/report', 'แจ้งปัญหา'], ['/track', 'ติดตามสถานะ']];
+    ? [['/report', 'แจ้งซ่อม'], ['/my', 'รายการแจ้งซ่อม'], ['/track', 'ติดตามสถานะ']]
+    : [['/', 'หน้าแรก'], ['/report', 'แจ้งซ่อม'], ['/track', 'ติดตามสถานะ']];
   return (
     <header className={`topnav${mobile.open ? ' menu-open' : ''}`}>
       <Logo to={role === 'REPORTER' ? '/my' : '/'} />
       <nav id="public-navigation" className="navlinks" aria-label="เมนูหลัก">
         {links.map(([to, label]) => <NavLink key={to} to={to} end onClick={() => mobile.setOpen(false)} className={({ isActive }) => `navlink${isActive ? ' active' : ''}`}>{label}</NavLink>)}
-        {(role === 'ADMIN' || role === 'STAFF') && <NavLink to={homeFor(role)} onClick={() => mobile.setOpen(false)} className="navlink">ไปหน้าเจ้าหน้าที่</NavLink>}
+        {(role === 'ADMIN' || role === 'STAFF') && <NavLink to={homeFor(role)} onClick={() => mobile.setOpen(false)} className="navlink">หน้าเจ้าหน้าที่</NavLink>}
       </nav>
-      <div className="row nav-actions" style={{ ['--gap' as string]: '10px' }}>
+      <div className="row nav-actions" style={{ ['--gap' as string]: '8px' }}>
         {!session || role === 'GUEST' ? (
           <>
             {role === 'GUEST' && <span className="rolechip tone-honey guest-chip"><Icon name="user" size={14} />ผู้เยี่ยมชม</span>}
             <Button kind="outline" sm onClick={() => nav('/login')}>เข้าสู่ระบบ</Button>
-            {!session && <Button className="nav-report" sm icon="plus" onClick={() => nav('/report')}>แจ้งปัญหา</Button>}
+            {!session && <Button className="nav-report" sm icon="plus" onClick={() => nav('/report')}>แจ้งซ่อม</Button>}
           </>
         ) : (
-          <div style={{ position: 'relative' }}>
-            <button className="userpill" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label={`บัญชี ${session.email}`}>
-              <span className="avatar">{initials(session.email)}</span>
-              <span className="who" style={{ textAlign: 'left' }}><span className="strong small" style={{ display: 'block' }}>{session.email}</span><span className="xs muted">{role === 'REPORTER' ? 'ผู้แจ้ง · Reporter' : role}</span></span>
-              <Icon name="down" size={16} />
-            </button>
-            {menu && (
-              <div className="card" style={{ position: 'absolute', right: 0, top: 50, padding: 8, minWidth: 200, zIndex: 30 }}>
-                <Link to="/account" className="btn ghost block" onClick={() => setMenu(false)}>ตั้งค่าบัญชี</Link>
-                <button className="btn ghost block" style={{ justifyContent: 'flex-start' }} onClick={async () => { await logout(); nav('/'); }}><Icon name="logout" />ออกจากระบบ</button>
-              </div>
-            )}
-          </div>
+          <>
+            <NavLink to="/notifications" className={({ isActive }) => `icon-btn ghost${isActive ? ' active' : ''}`} aria-label="การแจ้งเตือน" title="การแจ้งเตือน"><Icon name="bell" /></NavLink>
+            <div style={{ position: 'relative' }}>
+              <button className="userpill" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label={`บัญชี ${session.email}`}>
+                <span className="avatar">{initials(session.email)}</span>
+                <span className="who" style={{ textAlign: 'left' }}><span className="strong small" style={{ display: 'block' }}>{session.email}</span><span className="xs muted">{ROLE_LABEL[role ?? ''] ?? role}</span></span>
+                <Icon name="down" size={16} />
+              </button>
+              {menu && (
+                <div className="card" style={{ position: 'absolute', right: 0, top: 50, padding: 8, minWidth: 200, zIndex: 30 }}>
+                  <Link to="/account" className="btn ghost block" style={{ justifyContent: 'flex-start' }} onClick={() => setMenu(false)}><Icon name="settings" />ตั้งค่าบัญชี</Link>
+                  <button className="btn ghost block" style={{ justifyContent: 'flex-start' }} onClick={async () => { await logout(); nav('/'); }}><Icon name="logout" />ออกจากระบบ</button>
+                </div>
+              )}
+            </div>
+          </>
         )}
         <button ref={mobile.toggle} className="icon-btn mobile-toggle" type="button" aria-label={mobile.open ? 'ปิดเมนูหลัก' : 'เปิดเมนูหลัก'} aria-expanded={mobile.open} aria-controls="public-navigation" onClick={() => mobile.setOpen((open) => !open)}><Icon name={mobile.open ? 'x' : 'menu'} size={22} /></button>
       </div>
@@ -82,8 +86,8 @@ export function RequireRole({ roles, children }: { roles: Role[]; children: Reac
 }
 
 const MENUS: Record<'ADMIN' | 'STAFF', [string, string, string][]> = {
-  ADMIN: [['/admin', 'inbox', 'กล่องเรื่องเข้า'], ['/admin/departments', 'building', 'หน่วยงาน'], ['/admin/users', 'users', 'บัญชีเจ้าหน้าที่'], ['/admin/analytics', 'chart', 'รายงานวิเคราะห์']],
-  STAFF: [['/staff', 'inbox', 'คิวงานของหน่วยงาน']],
+  ADMIN: [['/admin', 'inbox', 'งานแจ้งซ่อม'], ['/admin/departments', 'building', 'หน่วยงาน'], ['/admin/users', 'users', 'บัญชีผู้ใช้'], ['/admin/analytics', 'chart', 'รายงาน']],
+  STAFF: [['/staff', 'inbox', 'คิวงานซ่อม']],
 };
 
 /** Sidebar layout for Admin and Staff. `counts` adds a small number next to a menu item. */
@@ -108,17 +112,17 @@ export function AppShell({ role, counts = {}, search }: { role: 'ADMIN' | 'STAFF
         </nav>
         <div className="usercard">
           <span className="avatar" style={{ width: 36, height: 36 }}>{initials(session?.email ?? '')}</span>
-          <div className="grow who"><div className="strong small" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{session?.email}</div><div className="xs muted">{role === 'ADMIN' ? 'Admin' : 'Staff'}</div></div>
-          <button className="icon-btn" aria-label="ออกจากระบบ" onClick={async () => { await logout(); nav('/login'); }}><Icon name="logout" /></button>
+          <div className="grow who"><div className="strong small" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{session?.email}</div><div className="xs muted">{ROLE_LABEL[role]}</div></div>
+          <IconButton icon="logout" label="ออกจากระบบ" onClick={async () => { await logout(); nav('/login'); }} />
         </div>
       </aside>
       <div className="main">
         <div className="topbar">
           <div className="search">{search}</div>
           <div className="row topbar-links">
-            <Link to="/account" className="small">ตั้งค่าบัญชี</Link>
-            <Link to="/notifications" className="small">การแจ้งเตือน</Link><Link to="/" className="small">ดูหน้าเว็บผู้แจ้ง</Link>
-            <span className={`rolechip ${role === 'ADMIN' ? 'tone-pink' : 'tone-lilac'}`}><Icon name={role === 'ADMIN' ? 'shield' : 'wrench'} size={14} />{role === 'ADMIN' ? 'Admin' : 'Staff'}</span>
+            <Link to="/" className="icon-btn ghost" aria-label="หน้าแจ้งซ่อม" title="หน้าแจ้งซ่อม"><Icon name="external" /></Link>
+            <Link to="/notifications" className="icon-btn ghost" aria-label="การแจ้งเตือน" title="การแจ้งเตือน"><Icon name="bell" /></Link>
+            <Link to="/account" className="icon-btn ghost" aria-label="ตั้งค่าบัญชี" title="ตั้งค่าบัญชี"><Icon name="settings" /></Link>
           </div>
         </div>
         <main className="content"><Outlet /></main>
@@ -138,5 +142,5 @@ export const PageHead = ({ title, sub, eyebrow, children }: { title: string; sub
   </div>
 );
 export const Crumb = ({ to, label, current }: { to: string; label: string; current: string }) => (
-  <div className="row wrap small" style={{ ['--gap' as string]: '8px' }}><Link to={to} className="crumb"><Icon name="back" size={16} />{label}</Link><span style={{ color: 'var(--ink-400)' }}>/</span><span className="muted strong">{current}</span></div>
+  <div className="row wrap small" style={{ ['--gap' as string]: '8px' }}><Link to={to} className="crumb"><Icon name="back" size={16} />{label}</Link><span style={{ color: 'var(--ink-400)' }}>/</span><span className="muted tid">{current}</span></div>
 );

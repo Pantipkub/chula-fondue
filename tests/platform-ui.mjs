@@ -73,7 +73,7 @@ try {
   const reportPage = await open(reporter, 390);
   await reportPage.goto(base + '/report');
   await reportPage.getByRole('radio', { name: 'อื่น ๆ', exact: true }).click();
-  await reportPage.getByLabel('รายละเอียดปัญหา', { exact: false }).fill(`Browser retry ${run}`);
+  await reportPage.getByLabel('รายละเอียด', { exact: false }).fill(`Browser retry ${run}`);
   await reportPage.getByLabel(/^อาคาร/).fill('หอสมุดกลาง');
   await reportPage.locator('input[type=file]').setInputFiles({ name: 'proof.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aSTsAAAAASUVORK5CYII=', 'base64') });
   let acceptedId; const keys = [];
@@ -89,9 +89,9 @@ try {
       await route.fulfill({ response });
     }
   });
-  await reportPage.getByRole('button', { name: 'ส่งเรื่อง', exact: true }).click();
+  await reportPage.getByRole('button', { name: 'ส่งแจ้งซ่อม', exact: true }).click();
   await reportPage.getByText('ระบบตอบช้าเกินไป ลองอีกครั้งในอีกสักครู่', { exact: true }).waitFor();
-  await reportPage.getByRole('button', { name: 'ส่งเรื่อง', exact: true }).click();
+  await reportPage.getByRole('button', { name: 'ส่งแจ้งซ่อม', exact: true }).click();
   await reportPage.waitForURL('**/report/done/**');
   assert.equal(keys.length, 2); assert.equal(new Set(keys).size, 1); assert.ok(keys[0]);
   assert.equal((await call('/tickets', reporter)).tickets.filter(t => t.description === `Browser retry ${run}`).length, 1);

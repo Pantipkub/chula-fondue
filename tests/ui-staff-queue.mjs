@@ -55,18 +55,20 @@ try {
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
   const rows = page.locator('.queue-table tbody tr');
-  const search = page.getByRole('textbox', { name: 'ค้นหาคำร้อง', exact: true });
+  const search = page.getByRole('textbox', { name: 'ค้นหางาน', exact: true });
   const status = page.getByRole('combobox', { name: 'สถานะ', exact: true });
   const category = page.getByRole('combobox', { name: 'หมวดหมู่', exact: true });
   const sort = page.getByRole('combobox', { name: 'เรียงตาม', exact: true });
   const size = page.getByRole('combobox', { name: 'รายการต่อหน้า', exact: true });
   const result = page.locator('.queue-results-heading [role=status]');
+  // Dropdowns are Radix Select: open the trigger, then choose the option by its value.
+  const pick = async (box, value) => { await box.click(); await page.locator(`[role=option][data-value="${value}"]`).click(); };
   const refresh = page.getByRole('button', { name: 'รีเฟรช', exact: true });
   const clear = async () => {
     await page.getByRole('button', { name: 'ล้างตัวกรอง', exact: true }).first().click();
     await expect(search).toHaveValue('');
-    await expect(status).toHaveValue('ACTIVE');
-    await expect(category).toHaveValue('');
+    await expect(status).toHaveAttribute('data-value', 'ACTIVE');
+    await expect(category).toHaveAttribute('data-value', '');
   };
   const fits = async label => {
     const bounds = await page.evaluate(() => ({ width: innerWidth, page: document.documentElement.scrollWidth, container: document.querySelector('.queue-workspace')?.scrollWidth, box: document.querySelector('.queue-workspace')?.clientWidth }));
@@ -75,7 +77,7 @@ try {
 
   await page.goto(base + '/staff');
   await expect(page.getByRole('alert')).toBeVisible();
-  await expect(page.getByText('ยังไม่มีงานที่มอบหมายให้หน่วยงานของคุณ', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('ยังไม่มีงานส่งถึงหน่วยงาน', { exact: true })).toHaveCount(0);
   mode = 'large';
   await page.getByRole('button', { name: 'ลองโหลดอีกครั้ง', exact: true }).click();
   await expect(rows).toHaveCount(20);
@@ -86,14 +88,14 @@ try {
   await page.screenshot({ path: `${output}/desktop-overview.png` });
   await page.getByRole('button', { name: 'ถัดไป', exact: true }).click();
   assert.equal(new URL(page.url()).searchParams.get('page'), '2');
-  await size.selectOption('50');
+  await pick(size, '50');
   await expect(rows).toHaveCount(50);
   assert.equal(new URL(page.url()).searchParams.get('page'), null, 'page size resets the page');
-  await sort.selectOption('newest');
+  await pick(sort, 'newest');
   await expect(rows.first()).toContainText('#00000000');
-  await status.selectOption('IN_PROGRESS');
+  await pick(status, 'IN_PROGRESS');
   await expect(result).toContainText('250 รายการ');
-  await category.selectOption('IT / Network');
+  await pick(category, 'IT / Network');
   await expect(result).toContainText('83 รายการ');
   await expect(rows).toHaveCount(50);
   await clear();
@@ -105,16 +107,16 @@ try {
   await expect(rows.first()).toContainText('#00000309');
   await search.fill('คำค้นที่ไม่มีอยู่');
   await expect(rows).toHaveCount(0);
-  await expect(page.getByText('ไม่พบคำร้องที่ตรงกับตัวกรอง', { exact: true })).toBeVisible();
+  await expect(page.getByText('ไม่พบงานที่ตรงเงื่อนไข', { exact: true })).toBeVisible();
   await clear();
-  await status.selectOption('CLOSED');
+  await pick(status, 'CLOSED');
   await expect(result).toContainText('250 รายการ');
-  await expect(rows.getByRole('button', { name: /เริ่มงาน/ })).toHaveCount(0);
-  await status.selectOption('ALL');
+  await expect(rows.getByRole('button', { name: /เริ่มซ่อม/ })).toHaveCount(0);
+  await pick(status, 'ALL');
   await expect(result).toContainText('1,000 รายการ');
-  await status.selectOption('IN_PROGRESS');
-  await category.selectOption('IT / Network');
-  await size.selectOption('10');
+  await pick(status, 'IN_PROGRESS');
+  await pick(category, 'IT / Network');
+  await pick(size, '10');
   await page.getByRole('button', { name: 'ถัดไป', exact: true }).click();
   const queueSearch = new URL(page.url()).search;
   await page.getByRole('link', { name: /ดูรายละเอียด #/ }).first().click();
@@ -122,12 +124,12 @@ try {
   await page.getByRole('link', { name: 'คิวงาน', exact: true }).click();
   await expect(rows).toHaveCount(10);
   assert.equal(new URL(page.url()).search, queueSearch, 'returning from details preserves queue filters and page');
-  await expect(status).toHaveValue('IN_PROGRESS');
+  await expect(status).toHaveAttribute('data-value', 'IN_PROGRESS');
   await clear();
-  await status.selectOption('ASSIGNED');
+  await pick(status, 'ASSIGNED');
   await search.fill('#00000000');
   await expect(rows).toHaveCount(1);
-  await page.getByRole('button', { name: 'เริ่มงาน #00000000', exact: true }).click();
+  await page.getByRole('button', { name: 'เริ่มซ่อม #00000000', exact: true }).click();
   await expect(rows).toHaveCount(0);
   assert.deepEqual(writes, [tickets[0].id], 'row action updates only the chosen ticket');
 
@@ -138,11 +140,11 @@ try {
     await fits(`${width}x${height}`);
     if (width <= 640) {
       await expect(status).toBeHidden();
-      await page.getByRole('button', { name: 'แสดงตัวกรองคำร้อง', exact: true }).click();
+      await page.getByRole('button', { name: 'แสดงตัวกรอง', exact: true }).click();
       await expect(status).toBeVisible();
-      await status.selectOption('IN_PROGRESS');
+      await pick(status, 'IN_PROGRESS');
       await fits(`${width}px expanded filters`);
-      await page.getByRole('button', { name: 'ซ่อนตัวกรองคำร้อง', exact: true }).click();
+      await page.getByRole('button', { name: 'ซ่อนตัวกรอง', exact: true }).click();
     }
     if (width === 375) await page.screenshot({ path: `${output}/mobile.png`, fullPage: true });
   }
@@ -154,7 +156,7 @@ try {
   await refresh.click();
   await expect(page.getByRole('alert')).toBeVisible();
   await expect(rows).toHaveCount(1);
-  await expect(page.getByText('แสดงข้อมูลล่าสุดที่โหลดสำเร็จ กดรีเฟรชเพื่อลองอีกครั้ง', { exact: true })).toBeVisible();
+  await expect(page.getByText('โหลดข้อมูลใหม่ไม่สำเร็จ กำลังแสดงข้อมูลล่าสุด', { exact: true })).toBeVisible();
   mode = 'single';
   await page.goto(base + '/staff');
   await expect(rows).toHaveCount(1);
@@ -162,13 +164,13 @@ try {
   await expect(page.getByRole('button', { name: 'ถัดไป', exact: true })).toBeDisabled();
   mode = 'closed';
   await refresh.click();
-  await expect(page.getByText('ไม่มีงานที่ต้องติดตาม', { exact: true })).toBeVisible();
+  await expect(page.getByText('ไม่มีงานค้าง', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'ดูงานทั้งหมด', exact: true }).click();
   await expect(rows).toHaveCount(20);
   mode = 'empty';
   await refresh.click();
   await expect(rows).toHaveCount(0);
-  await expect(page.getByText('ยังไม่มีงานที่มอบหมายให้หน่วยงานของคุณ', { exact: true })).toBeVisible();
+  await expect(page.getByText('ยังไม่มีงานส่งถึงหน่วยงาน', { exact: true })).toBeVisible();
   assert.deepEqual(errors, [], 'no browser runtime errors');
   assert.deepEqual(unexpected, [], 'only expected fixture requests');
   console.log('PASS: 0 / 1 / 1,000 tickets, search, combined filters, sorting, pagination, return navigation, start action, errors and 10 viewport sizes');

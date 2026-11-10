@@ -67,7 +67,7 @@ async function signedIn(page, email) {
 async function replaced(page) {
   await page.waitForURL('**/login');
   await page.getByText(notice, { exact: true }).waitFor();
-  assert.equal(await page.getByRole('heading', { name: 'เรื่องของฉัน', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('heading', { name: 'รายการแจ้งซ่อม', exact: true }).count(), 0);
 }
 
 try {
@@ -86,7 +86,7 @@ try {
   await old.reload(); await replaced(old);
   await old.goto(base + '/my'); await replaced(old); // Reload/direct navigation cannot adopt Bob's session.
   await winner.reload(); await signedIn(winner, bob);
-  await old.getByRole('button', { name: 'ดำเนินการต่อแบบผู้เยี่ยมชม', exact: true }).click();
+  await old.getByRole('button', { name: 'เข้าใช้งานแบบผู้เยี่ยมชม', exact: true }).click();
   await old.waitForURL('**/report'); await signedIn(winner, bob);
   assert.equal(await old.getByRole('button', { name: `บัญชี ${bob}`, exact: true }).count(), 0);
   await login(old, alice); await replaced(winner); await signedIn(old, alice);
