@@ -79,6 +79,21 @@ npm run test:ui
 
 CI รัน build, unit, API, broker recovery และ responsive UI checks แล้วเก็บ evidence. ต้องดูผล CI จริงก่อนอ้างว่าผ่าน.
 
+## Load testing
+
+ทดสอบ Average load (50 VUs) และ Stress (50 → 100 → 200 → 50 VUs) ผ่าน gateway ด้วย k6 บน Docker:
+
+```powershell
+npm run test:load
+npm run test:stress
+# รันทั้งสองประเภท พร้อมบันทึก CPU/RAM และรายงานผล
+npm run test:perf
+# ตรวจ script แบบสั้น ผลนี้ไม่ใช้สรุป performance
+npm run test:perf -- --quick
+```
+
+ต้องเปิด Compose project `fondue-demo` และมี image `grafana/k6:1.8.2` ก่อน (`docker pull grafana/k6:1.8.2`). ผลแต่ละรอบอยู่ใน `test-results/load/`; เปิด `report.html` เพื่อดูกราฟแยก Average-load / Stress ดู [วิธีรันและตัวเลือก](docs/load-testing.md). การทดสอบสร้างบัญชีและคำร้องสำหรับ fixture ในฐานข้อมูล local; ไม่ล้างข้อมูลเดิม.
+
 ## เปิดการส่งต่ออัตโนมัติ
 
 ตั้ง `AUTO_ROUTING_ENABLED=true` ใน `.env.demo` (หรือ `.env` ของ deployment ที่ใช้) แล้วอัปเดตบริการ:
